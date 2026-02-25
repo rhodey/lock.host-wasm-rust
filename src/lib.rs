@@ -60,7 +60,7 @@ async fn echo_headers(req: Request<IncomingBody>, responder: Responder) -> Finis
         headers_json.entry(key).or_default().push(val);
     }
 
-    let body = serde_json::to_string(&headers_json).unwrap_or_else(|_| "{}".to_string());
+    let body = serde_json::to_string_pretty(&headers_json).unwrap_or_else(|_| "{}".to_string());
     let res = Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "application/json")
