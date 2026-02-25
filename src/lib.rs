@@ -7,19 +7,25 @@ use wstd::time::{Duration, Instant};
 #[wstd::http_server]
 async fn main(req: Request<IncomingBody>, res: Responder) -> Finished {
     match req.uri().path_and_query().unwrap().as_str() {
+        "/" => hi(req, res).await,
         "/wait" => wait(req, res).await,
         "/echo" => echo(req, res).await,
         "/echo-headers" => echo_headers(req, res).await,
         "/echo-trailers" => echo_trailers(req, res).await,
-        "/" => home(req, res).await,
         _ => not_found(req, res).await,
     }
 }
 
-async fn home(_req: Request<IncomingBody>, res: Responder) -> Finished {
-    // To send a single string as the response body, use `res::respond`.
-    res.respond(Response::new("Hello, wasi:http/proxy world!\n".into_body()))
-        .await
+async fn hi(_req: Request<IncomingBody>, res: Responder) -> Finished {
+    res.respond(Response::new("hi!\n".into_body())).await
+}
+
+async fn not_found(_req: Request<IncomingBody>, responder: Responder) -> Finished {
+    let res = Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body("404\n".into_body())
+        .unwrap();
+    responder.respond(res).await
 }
 
 async fn wait(_req: Request<IncomingBody>, res: Responder) -> Finished {
@@ -76,12 +82,4 @@ async fn echo_trailers(req: Request<IncomingBody>, res: Responder) -> Finished {
         Err(err) => (Default::default(), Err(std::io::Error::other(err))),
     };
     Finished::finish(body, result, trailers)
-}
-
-async fn not_found(_req: Request<IncomingBody>, responder: Responder) -> Finished {
-    let res = Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(empty())
-        .unwrap();
-    responder.respond(res).await
 }
