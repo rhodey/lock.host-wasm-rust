@@ -15,8 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-wasip2
 
       - name: Just
         run: sudo apt install -y just
