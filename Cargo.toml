@@ -1,5 +1,5 @@
 [package]
-name = "lock.host-wasm-rust"
+name = "lock-host-wasm-rust"
 version = "0.1.0"
 edition = "2021"
 publish = false
