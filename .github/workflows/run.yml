@@ -14,11 +14,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          node-version: '23.x'
+          targets: wasm32-wasip2
+
+      - name: Just
+        run: cargo install just
 
       - name: Build
         run: |
-          npm install
-          npm run build
+          just setup
+          just build
