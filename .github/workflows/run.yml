@@ -19,7 +19,7 @@ jobs:
           targets: wasm32-wasip2
 
       - name: Just
-        run: cargo install just
+        run: sudo apt install -y just
 
       - name: Build
         run: |
