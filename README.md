@@ -37,7 +37,7 @@ just joke 'why did the worker quit his job at the recycling factory? because it 
 ## How
 WASM WASI 0.2 allows [all these interfaces](https://github.com/yoshuawuyts/awesome-wasm-components?tab=readme-ov-file#interfaces) and more
 
-Rust [.cargo/config.yml](.cargo/config.yml) applies `target = "wasm32-wasip2"` and many crates just work
+Rust [.cargo/config.toml](.cargo/config.toml) applies `target = "wasm32-wasip2"` and many crates just work
 
 Expect to see SQLite show up in here soon
 
