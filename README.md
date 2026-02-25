@@ -42,8 +42,8 @@ Rust [.cargo/config.toml](.cargo/config.toml) applies `target = "wasm32-wasip2"`
 Expect to see SQLite show up in here soon
 
 ## Performance
-1. npx loadtest -n 10000 http://localhost:8080 == 5274 RPS
-2. npx loadtest -n 10000 -k http://localhost:8080 == 6010 RPS
+1. npx loadtest -n 10000 http://localhost:8080 == 11338 RPS
+2. npx loadtest -n 10000 -k http://localhost:8080 == 15385 RPS
 
 ## License
 hello@lock.host
