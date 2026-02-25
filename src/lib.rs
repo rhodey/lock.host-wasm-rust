@@ -48,9 +48,24 @@ async fn echo(mut req: Request<IncomingBody>, res: Responder) -> Finished {
 }
 
 async fn echo_headers(req: Request<IncomingBody>, responder: Responder) -> Finished {
-    let mut res = Response::builder();
-    *res.headers_mut().unwrap() = req.into_parts().0.headers;
-    let res = res.body(empty()).unwrap();
+    let (parts, _body) = req.into_parts();
+    let mut headers_json: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
+    for (name, value) in parts.headers.iter() {
+        let key = name.as_str().to_string();
+        let val = match value.to_str() {
+            Ok(s) => s.to_string(),
+            Err(_) => String::from_utf8_lossy(value.as_bytes()).to_string(),
+        };
+        headers_json.entry(key).or_default().push(val);
+    }
+
+    let body = serde_json::to_string(&headers_json).unwrap_or_else(|_| "{}".to_string());
+    let res = Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/json")
+        .body(body.into_body())
+        .unwrap();
     responder.respond(res).await
 }
 
