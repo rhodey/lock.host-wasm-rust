@@ -1,6 +1,6 @@
 [package]
-name = "sample-wasi-http-rust"
-version = "0.0.0"
+name = "lock.host-wasm-rust"
+version = "0.1.0"
 edition = "2021"
 publish = false
 

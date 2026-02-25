@@ -1,2 +1,5 @@
-/target
-/wit/deps
+.env*
+*\.swp
+dist/
+target/
+wit/deps/
