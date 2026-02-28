@@ -1,8 +1,8 @@
 package local:app;
 
 interface helpers-interface {
-  chat-completion: func(api-key: string, json: string) -> string;
-  get-balance: func(rpc: string, address: string) -> string;
+  chat-completion: async func(api-key: string, json: string) -> string;
+  get-balance: async func(rpc: string, address: string) -> string;
 }
 
 world helpers {

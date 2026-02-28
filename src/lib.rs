@@ -9,6 +9,7 @@ mod bindings {
     wit_bindgen::generate!({
         path: "wit",
         world: "app",
+        async: true,
     });
 }
 
@@ -43,7 +44,7 @@ async fn get_balance(req: Request<IncomingBody>, responder: Responder) -> Finish
         return bad_request(responder, "missing query param `addr`\n").await;
     };
 
-    let output = bindings::local::app::helpers_interface::get_balance(&rpc, &input);
+    let output = bindings::local::app::helpers_interface::async_get_balance(&rpc, &input).await;
     let response = Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "text/plain")
@@ -73,7 +74,7 @@ async fn chat_completion(req: Request<IncomingBody>, responder: Responder) -> Fi
     })
     .to_string();
 
-    let output = bindings::local::app::helpers_interface::chat_completion(&api_key, &payload);
+    let output = bindings::local::app::helpers_interface::async_chat_completion(&api_key, &payload).await;
     let response = Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "application/json")
