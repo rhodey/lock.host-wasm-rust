@@ -4,6 +4,24 @@ use wstd::http::{IntoBody, Request, Response, StatusCode};
 use wstd::io::{copy, AsyncWrite};
 use wstd::time::{Duration, Instant};
 
+mod bindings {
+    wit_bindgen::generate!({
+        inline: r#"
+            package local:app;
+
+            interface helpers-interface {
+                helper-open-a-i: func(x: string) -> string;
+                helper-solana: func(x: string) -> string;
+            }
+
+            world helper-imports {
+                import helpers-interface;
+            }
+        "#,
+        world: "helper-imports",
+    });
+}
+
 #[wstd::http_server]
 async fn main(req: Request<IncomingBody>, res: Responder) -> Finished {
     match req.uri().path_and_query().unwrap().as_str() {
@@ -11,8 +29,59 @@ async fn main(req: Request<IncomingBody>, res: Responder) -> Finished {
         "/wait" => wait(req, res).await,
         "/echo" => echo(req, res).await,
         "/echo-headers" => echo_headers(req, res).await,
+        "/api/helper-openai" => helper_openai(req, res).await,
+        "/api/helper-solana" => helper_solana(req, res).await,
         _ => not_found(req, res).await,
     }
+}
+
+fn query_param(req: &Request<IncomingBody>, key: &str) -> Option<String> {
+    req.uri().query().and_then(|query| {
+        query.split('&').find_map(|pair| {
+            let (k, v) = pair.split_once('=')?;
+            if k == key {
+                Some(v.to_string())
+            } else {
+                None
+            }
+        })
+    })
+}
+
+async fn helper_openai(req: Request<IncomingBody>, responder: Responder) -> Finished {
+    let Some(input) = query_param(&req, "x") else {
+        return bad_request(responder, "missing query param `x`\n").await;
+    };
+
+    let output = bindings::local::app::helpers_interface::helper_open_a_i(&input);
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "text/plain")
+        .body(format!("{output}\n").into_body())
+        .unwrap();
+    responder.respond(response).await
+}
+
+async fn helper_solana(req: Request<IncomingBody>, responder: Responder) -> Finished {
+    let Some(input) = query_param(&req, "x") else {
+        return bad_request(responder, "missing query param `x`\n").await;
+    };
+
+    let output = bindings::local::app::helpers_interface::helper_solana(&input);
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "text/plain")
+        .body(format!("{output}\n").into_body())
+        .unwrap();
+    responder.respond(response).await
+}
+
+async fn bad_request(responder: Responder, message: &str) -> Finished {
+    let res = Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .body(message.to_string().into_body())
+        .unwrap();
+    responder.respond(res).await
 }
 
 async fn hi(_req: Request<IncomingBody>, res: Responder) -> Finished {

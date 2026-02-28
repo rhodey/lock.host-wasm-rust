@@ -10,6 +10,6 @@ world helpers {
 }
 
 world app {
-  include helpers;
+  import helpers-interface;
   include wasi:http/proxy@0.2.2;
 }
