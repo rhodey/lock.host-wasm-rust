@@ -17,13 +17,6 @@ const textSeed32 = (seed) => {
   return sha512(seed).slice(0, 32)
 }
 
-const addressFromSeed = (seed) => {
-  const priv = textSeed32(seed)
-  const pub = ed.getPublicKey(priv)
-  const senderAddressStr = bs58.encode(pub)
-  return address(senderAddressStr)
-}
-
 const signerFromSeed = (seed) => {
   const priv = textSeed32(seed)
   const pub = ed.getPublicKey(priv)
