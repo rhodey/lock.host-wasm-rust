@@ -18,6 +18,7 @@ async fn main(req: Request<IncomingBody>, res: Responder) -> Finished {
         "/wait" => wait(req, res).await,
         "/echo" => echo(req, res).await,
         "/echo-headers" => echo_headers(req, res).await,
+        "/api/chat-completion" => chat_completion(req, res).await,
         "/api/helper-openai" => helper_openai(req, res).await,
         "/api/helper-solana" => helper_solana(req, res).await,
         _ => not_found(req, res).await,
@@ -61,6 +62,36 @@ async fn helper_solana(req: Request<IncomingBody>, responder: Responder) -> Fini
         .status(StatusCode::OK)
         .header("content-type", "text/plain")
         .body(format!("{output}\n").into_body())
+        .unwrap();
+    responder.respond(response).await
+}
+
+async fn chat_completion(req: Request<IncomingBody>, responder: Responder) -> Finished {
+    let Some(api_key) = query_param(&req, "apiKey") else {
+        return bad_request(responder, "missing query param `apiKey`\n").await;
+    };
+
+    let Some(message) = query_param(&req, "message") else {
+        return bad_request(responder, "missing query param `message`\n").await;
+    };
+
+    let model = query_param(&req, "model").unwrap_or_else(|| "gpt-4o-mini".to_string());
+    let payload = serde_json::json!({
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": message,
+            }
+        ]
+    })
+    .to_string();
+
+    let output = bindings::local::app::helpers_interface::chat_completion(&api_key, &payload);
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/json")
+        .body(output.into_body())
         .unwrap();
     responder.respond(response).await
 }
