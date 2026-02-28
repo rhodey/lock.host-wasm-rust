@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "bundle": "rollup -c",
-    "build": "npm run bundle && componentize-js dist/bundle.js --wit ../wit --world-name helpers --disable http fetch-event -o dist/bundle.wasm"
+    "build": "npm run bundle && componentize-js dist/bundle.js --wit ../wit --world-name helpers --disable fetch-event -o dist/bundle.wasm"
   },
   "devDependencies": {
     "@bytecodealliance/componentize-js": "0.19.3",
