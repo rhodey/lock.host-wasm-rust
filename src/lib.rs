@@ -6,19 +6,9 @@ use wstd::time::{Duration, Instant};
 
 mod bindings {
     wit_bindgen::generate!({
-        inline: r#"
-            package local:app;
-
-            interface helpers-interface {
-                helper-open-a-i: func(x: string) -> string;
-                helper-solana: func(x: string) -> string;
-            }
-
-            world helper-imports {
-                import helpers-interface;
-            }
-        "#,
-        world: "helper-imports",
+        path: "wit",
+        world: "app",
+        generate_all,
     });
 }
 
