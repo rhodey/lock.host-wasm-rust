@@ -20,8 +20,7 @@ async fn main(req: Request<IncomingBody>, res: Responder) -> Finished {
         "/echo" => echo(req, res).await,
         "/echo-headers" => echo_headers(req, res).await,
         "/api/chat-completion" => chat_completion(req, res).await,
-        "/api/helper-openai" => helper_openai(req, res).await,
-        "/api/helper-solana" => helper_solana(req, res).await,
+        "/api/get-balance" => get_balance(req, res).await,
         _ => not_found(req, res).await,
     }
 }
@@ -38,21 +37,7 @@ fn query_param(req: &Request<IncomingBody>, key: &str) -> Option<String> {
     })
 }
 
-async fn helper_openai(req: Request<IncomingBody>, responder: Responder) -> Finished {
-    let Some(input) = query_param(&req, "x") else {
-        return bad_request(responder, "missing query param `x`\n").await;
-    };
-
-    let output = bindings::local::app::helpers_interface::helper_open_a_i(&input);
-    let response = Response::builder()
-        .status(StatusCode::OK)
-        .header("content-type", "text/plain")
-        .body(format!("{output}\n").into_body())
-        .unwrap();
-    responder.respond(response).await
-}
-
-async fn helper_solana(req: Request<IncomingBody>, responder: Responder) -> Finished {
+async fn get_balance(req: Request<IncomingBody>, responder: Responder) -> Finished {
     let rpc = "https://api.devnet.solana.com";
     let Some(input) = query_param(&req, "addr") else {
         return bad_request(responder, "missing query param `addr`\n").await;

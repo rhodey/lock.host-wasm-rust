@@ -1,15 +1,6 @@
 import OpenAI from 'openai'
 import './shim.js'
 import sol from './sol.js'
-// import { addressFromStr, signerFromSeed, getBalance, transfer } from './sol.js'
-
-function helperOpenAI(input) {
-  return input + `456`
-}
-
-function helperSolana(input) {
-  return input + `789`
-}
 
 async function fetchNative(url, apiKey, body) {
   const headers = { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' }
@@ -42,8 +33,6 @@ async function getBalance(rpc, address) {
 }
 
 export const helpersInterface = {
-  helperOpenAI,
-  helperSolana,
   chatCompletion,
   getBalance,
 }
