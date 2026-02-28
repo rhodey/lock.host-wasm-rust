@@ -53,11 +53,12 @@ async fn helper_openai(req: Request<IncomingBody>, responder: Responder) -> Fini
 }
 
 async fn helper_solana(req: Request<IncomingBody>, responder: Responder) -> Finished {
+    let rpc = "https://api.devnet.solana.com";
     let Some(input) = query_param(&req, "addr") else {
         return bad_request(responder, "missing query param `addr`\n").await;
     };
 
-    let output = bindings::local::app::helpers_interface::get_balance(&input);
+    let output = bindings::local::app::helpers_interface::get_balance(&rpc, &input);
     let response = Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "text/plain")

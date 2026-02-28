@@ -28,10 +28,12 @@ async function chatCompletion(apiKey, json) {
   }
 }
 
-async function getBalance(address) {
+async function getBalance(rpc, address) {
+  console.log(123, address)
+  console.log(456, address)
   try {
+    address = String(address)
     address = sol.addressFromStr(address)
-    const rpc = 'https://api.devnet.solana.com'
     const ok = await sol.getBalance(rpc, address)
     return String(ok)
   } catch (err) {

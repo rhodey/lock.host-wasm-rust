@@ -4,7 +4,7 @@ interface helpers-interface {
   helper-open-a-i: func(x: string) -> string;
   helper-solana: func(x: string) -> string;
   chat-completion: func(api-key: string, json: string) -> string;
-  get-balance: func(address: string) -> string;
+  get-balance: func(rpc: string, address: string) -> string;
 }
 
 world helpers {
