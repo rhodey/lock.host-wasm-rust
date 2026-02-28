@@ -370,6 +370,7 @@ name = "lock-host-wasm-rust"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+ "url",
  "wit-bindgen",
  "wit-bindgen-rt 0.41.0",
  "wstd",

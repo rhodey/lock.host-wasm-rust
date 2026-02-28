@@ -1,3 +1,4 @@
+use url::form_urlencoded;
 use wstd::http::body::{BodyForthcoming, IncomingBody};
 use wstd::http::server::{Finished, Responder};
 use wstd::http::{IntoBody, Request, Response, StatusCode};
@@ -27,10 +28,9 @@ async fn main(req: Request<IncomingBody>, res: Responder) -> Finished {
 
 fn query_param(req: &Request<IncomingBody>, key: &str) -> Option<String> {
     req.uri().query().and_then(|query| {
-        query.split('&').find_map(|pair| {
-            let (k, v) = pair.split_once('=')?;
+        form_urlencoded::parse(query.as_bytes()).find_map(|(k, v)| {
             if k == key {
-                Some(v.to_string())
+                Some(v.into_owned())
             } else {
                 None
             }
@@ -88,8 +88,14 @@ async fn chat_completion(req: Request<IncomingBody>, responder: Responder) -> Fi
     .to_string();
 
     let output = bindings::local::app::helpers_interface::chat_completion(&api_key, &payload);
+    let status = serde_json::from_str::<serde_json::Value>(&output)
+        .ok()
+        .and_then(|json| json.get("error").cloned())
+        .map(|_| StatusCode::BAD_REQUEST)
+        .unwrap_or(StatusCode::OK);
+
     let response = Response::builder()
-        .status(StatusCode::OK)
+        .status(status)
         .header("content-type", "application/json")
         .body(output.into_body())
         .unwrap();
