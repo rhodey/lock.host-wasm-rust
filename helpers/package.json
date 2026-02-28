@@ -1,0 +1,23 @@
+{
+  "name": "helpers",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bundle": "rollup -c",
+    "build": "npm run bundle && componentize-js dist/bundle.js --wit ../wit --world-name helpers --disable http fetch-event -o dist/bundle.wasm"
+  },
+  "devDependencies": {
+    "@bytecodealliance/componentize-js": "0.19.0",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-replace": "^6.0.3",
+    "rollup": "^4.50.1"
+  },
+  "dependencies": {
+    "@noble/ed25519": "^3.0.0",
+    "@noble/hashes": "^2.0.1",
+    "@solana-program/system": "^0.12.0",
+    "@solana/kit": "^6.1.0",
+    "bs58": "^6.0.0",
+    "openai": "^6.22.0"
+  }
+}

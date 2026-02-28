@@ -1,7 +1,7 @@
 use wstd::http::body::{BodyForthcoming, IncomingBody};
 use wstd::http::server::{Finished, Responder};
 use wstd::http::{IntoBody, Request, Response, StatusCode};
-use wstd::io::{copy, empty, AsyncWrite};
+use wstd::io::{copy, AsyncWrite};
 use wstd::time::{Duration, Instant};
 
 #[wstd::http_server]
@@ -11,7 +11,6 @@ async fn main(req: Request<IncomingBody>, res: Responder) -> Finished {
         "/wait" => wait(req, res).await,
         "/echo" => echo(req, res).await,
         "/echo-headers" => echo_headers(req, res).await,
-        "/echo-trailers" => echo_trailers(req, res).await,
         _ => not_found(req, res).await,
     }
 }
@@ -73,13 +72,4 @@ async fn echo_headers(req: Request<IncomingBody>, responder: Responder) -> Finis
         .body(body.into_body())
         .unwrap();
     responder.respond(res).await
-}
-
-async fn echo_trailers(req: Request<IncomingBody>, res: Responder) -> Finished {
-    let body = res.start_response(Response::new(BodyForthcoming));
-    let (trailers, result) = match req.into_body().finish().await {
-        Ok(trailers) => (trailers, Ok(())),
-        Err(err) => (Default::default(), Err(std::io::Error::other(err))),
-    };
-    Finished::finish(body, result, trailers)
 }

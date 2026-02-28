@@ -27,7 +27,7 @@ curl https://wasmtime.dev/install.sh -sSf | bash
 + [app wallet](https://explorer.solana.com/address/DohcaGiBiC3yuPz4gHtoA7QJhyL5N7hk3EpnfFyHZR2S?cluster=devnet)
 + [user wallet](https://explorer.solana.com/address/CFf6SMjR3eNKR7me9CGHhRNE1SwSQaPi5r4MWZQFGB2W?cluster=devnet)
 ```
-just setup build
+just build
 cp example.env .env
 just run
 just joke 'why did the worker quit his job at the recycling factory? because it was soda pressing.'

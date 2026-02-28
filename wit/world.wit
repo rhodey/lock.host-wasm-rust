@@ -1,5 +1,15 @@
-package component:sample-wasi-http-rust;
+package local:app;
 
-world sample-wasi-http-rust {
+interface helpers-interface {
+  helper-open-a-i: func(x: string) -> string;
+  helper-solana: func(x: string) -> string;
+}
+
+world helpers {
+  export helpers-interface;
+}
+
+world app {
+  include helpers;
   include wasi:http/proxy@0.2.2;
 }

@@ -2,4 +2,5 @@
 *\.swp
 dist/
 target/
-wit/deps/
+helpers/dist/
+helpers/node_modules/
