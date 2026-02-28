@@ -7,8 +7,7 @@ use wstd::time::{Duration, Instant};
 mod bindings {
     wit_bindgen::generate!({
         path: "wit",
-        world: "app",
-        generate_all,
+        world: "helper-imports",
     });
 }
 

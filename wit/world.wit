@@ -13,3 +13,8 @@ world app {
   import helpers-interface;
   include wasi:http/proxy@0.2.2;
 }
+
+
+world helper-imports {
+  import helpers-interface;
+}
