@@ -47,11 +47,14 @@ fn read_json_body(stream: bindings::wasi::io::streams::InputStream) -> (StatusCo
                 }
                 bytes.extend_from_slice(&chunk);
             }
-            Err(_) => {
+            Err(bindings::wasi::io::streams::StreamError::Closed) => break,
+            Err(bindings::wasi::io::streams::StreamError::LastOperationFailed(error)) => {
+                let message = error.to_debug_string();
+
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    serde_json::json!({ "error": "failed reading helper stream" }).to_string(),
-                )
+                    serde_json::json!({ "error": message }).to_string(),
+                );
             }
         }
     }
