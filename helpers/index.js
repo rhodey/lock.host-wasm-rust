@@ -1,4 +1,3 @@
-import OpenAI from 'openai'
 import './shim.js'
 import { addressFromStr, signerFromSeed, getBalance, transfer } from './sol.js'
 
@@ -11,10 +10,27 @@ function helperSolana(input) {
 }
 
 async function chatCompletion(apiKey, json) {
-  json = JSON.parse(json)
-  const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
-  const reply = await client.chat.completions.create(json)
-  return JSON.stringify(reply)
+  const payload = JSON.parse(json)
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const text = await response.text()
+  if (!response.ok) {
+    return JSON.stringify({
+      error: {
+        status: response.status,
+        body: text,
+      },
+    })
+  }
+
+  return text
 }
 
 export const helpersInterface = {
