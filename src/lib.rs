@@ -1,4 +1,5 @@
 use form_urlencoded;
+use serde_json::Value;
 use wstd::http::body::Body;
 use wstd::http::{Error, Request, Response, StatusCode};
 use wstd::time::{Duration, Instant};
@@ -7,6 +8,7 @@ mod bindings {
     wit_bindgen::generate!({
         path: "wit",
         world: "app",
+        generate_all,
     });
 }
 
@@ -35,6 +37,66 @@ fn query_param(req: &Request<Body>, key: &str) -> Option<String> {
     })
 }
 
+fn read_json_body(stream: bindings::wasi::io::streams::InputStream) -> (StatusCode, String) {
+    let mut bytes = Vec::new();
+    loop {
+        match stream.blocking_read(8_192) {
+            Ok(chunk) => {
+                if chunk.is_empty() {
+                    break;
+                }
+                bytes.extend_from_slice(&chunk);
+            }
+            Err(_) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    serde_json::json!({ "error": "failed reading helper stream" }).to_string(),
+                )
+            }
+        }
+    }
+
+    let body = match String::from_utf8(bytes) {
+        Ok(body) => body,
+        Err(err) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                serde_json::json!({ "error": format!("invalid utf-8: {err}") }).to_string(),
+            )
+        }
+    };
+
+    let parsed: Value = match serde_json::from_str(&body) {
+        Ok(parsed) => parsed,
+        Err(err) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                serde_json::json!({ "error": format!("invalid json: {err}") }).to_string(),
+            )
+        }
+    };
+
+    let is_error = parsed
+        .as_object()
+        .and_then(|obj| obj.get("error"))
+        .map(|v| v.is_string())
+        .unwrap_or(false);
+
+    if is_error {
+        (StatusCode::INTERNAL_SERVER_ERROR, body)
+    } else {
+        (StatusCode::OK, body)
+    }
+}
+
+fn build_json_response(status: StatusCode, body: String) -> Response<Body> {
+    Response::builder()
+        .status(status)
+        .header("content-type", "application/json")
+        .body(body.into())
+        .unwrap()
+}
+
 async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
     let rpc = "https://api.devnet.solana.com";
     let Some(input) = query_param(&req, "addr") else {
@@ -42,11 +104,8 @@ async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
     };
 
     let output = bindings::local::app::helpers_interface::get_balance(&rpc, &input);
-    Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header("content-type", "text/plain")
-        .body(format!("{output}\n").into())
-        .unwrap())
+    let (status, body) = read_json_body(output);
+    Ok(build_json_response(status, body))
 }
 
 async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
@@ -71,11 +130,8 @@ async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
     .to_string();
 
     let output = bindings::local::app::helpers_interface::chat_completion(&api_key, &payload);
-    Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header("content-type", "application/json")
-        .body(output.into())
-        .unwrap())
+    let (status, body) = read_json_body(output);
+    Ok(build_json_response(status, body))
 }
 
 async fn bad_request(message: &str) -> Result<Response<Body>, Error> {
@@ -101,7 +157,9 @@ async fn wait(_req: Request<Body>) -> Result<Response<Body>, Error> {
     wstd::task::sleep(Duration::from_secs(1)).await;
     let elapsed = Instant::now().duration_since(now).as_millis();
 
-    Ok(Response::new(format!("slept for {elapsed} millis\n").into()))
+    Ok(Response::new(
+        format!("slept for {elapsed} millis\n").into(),
+    ))
 }
 
 async fn echo(req: Request<Body>) -> Result<Response<Body>, Error> {

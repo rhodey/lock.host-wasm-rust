@@ -1,8 +1,10 @@
 package local:app;
 
 interface helpers-interface {
-  chat-completion: func(api-key: string, json: string) -> string;
-  get-balance: func(rpc: string, address: string) -> string;
+  use wasi:io/streams@0.2.2.{input-stream};
+
+  chat-completion: func(api-key: string, json: string) -> input-stream;
+  get-balance: func(rpc: string, address: string) -> input-stream;
 }
 
 world helpers {
