@@ -7,10 +7,7 @@ helpers:
   npm --prefix helpers run build
 
 plug:
-  wac plug \
-    target/wasm32-wasip2/release/lock_host_wasm_rust.wasm \
-    --plug helpers/dist/bundle.wasm \
-    -o target/wasm32-wasip2/release/total.wasm
+  cp target/wasm32-wasip2/release/lock_host_wasm_rust.wasm target/wasm32-wasip2/release/total.wasm
 
 build:
   just helpers

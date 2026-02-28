@@ -1,16 +1,7 @@
 use form_urlencoded;
-use serde_json::Value;
 use wstd::http::body::Body;
-use wstd::http::{Error, Request, Response, StatusCode};
+use wstd::http::{BodyExt, Client, Error, Method, Request, Response, StatusCode, Uri};
 use wstd::time::{Duration, Instant};
-
-mod bindings {
-    wit_bindgen::generate!({
-        path: "wit",
-        world: "app",
-        generate_all,
-    });
-}
 
 #[wstd::http_server]
 async fn main(req: Request<Body>) -> Result<Response<Body>, Error> {
@@ -37,74 +28,6 @@ fn query_param(req: &Request<Body>, key: &str) -> Option<String> {
     })
 }
 
-fn read_json_body(stream: bindings::wasi::io::streams::InputStream) -> (StatusCode, String) {
-    let mut bytes = Vec::new();
-    let mut empty_reads = 0u32;
-    loop {
-        match stream.blocking_read(8_192) {
-            Ok(chunk) => {
-                if chunk.is_empty() {
-                    empty_reads += 1;
-                    if !bytes.is_empty() && empty_reads >= 3 {
-                        break;
-                    }
-                    if bytes.is_empty() && empty_reads >= 500 {
-                        return (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            serde_json::json!({ "error": "timed out reading helper stream" })
-                                .to_string(),
-                        );
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-                    continue;
-                }
-
-                empty_reads = 0;
-                bytes.extend_from_slice(&chunk);
-            }
-            Err(bindings::wasi::io::streams::StreamError::Closed) => break,
-            Err(_) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    serde_json::json!({ "error": "failed reading helper stream" }).to_string(),
-                )
-            }
-        }
-    }
-
-    let body = match String::from_utf8(bytes) {
-        Ok(body) => body,
-        Err(err) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                serde_json::json!({ "error": format!("invalid utf-8: {err}") }).to_string(),
-            )
-        }
-    };
-
-    let parsed: Value = match serde_json::from_str(&body) {
-        Ok(parsed) => parsed,
-        Err(err) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                serde_json::json!({ "error": format!("invalid json: {err}") }).to_string(),
-            )
-        }
-    };
-
-    let is_error = parsed
-        .as_object()
-        .and_then(|obj| obj.get("error"))
-        .map(|v| v.is_string())
-        .unwrap_or(false);
-
-    if is_error {
-        (StatusCode::INTERNAL_SERVER_ERROR, body)
-    } else {
-        (StatusCode::OK, body)
-    }
-}
-
 fn build_json_response(status: StatusCode, body: String) -> Response<Body> {
     Response::builder()
         .status(status)
@@ -114,36 +37,95 @@ fn build_json_response(status: StatusCode, body: String) -> Response<Body> {
 }
 
 async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
-    let rpc = "https://api.devnet.solana.com";
-    let Some(input) = query_param(&req, "addr") else {
+    let Some(address) = query_param(&req, "addr") else {
         return bad_request("missing query param `addr`\n").await;
     };
 
-    let output = bindings::local::app::helpers_interface::get_balance(&rpc, &input);
-    let (status, body) = read_json_body(output);
-    Ok(build_json_response(status, body))
-}
-
-async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
-    let Some(_api_key) = query_param(&req, "apiKey") else {
-        return bad_request("missing query param `apiKey`
-").await;
-    };
-
-    let Some(message) = query_param(&req, "message") else {
-        return bad_request("missing query param `message`
-").await;
-    };
-
-    let model = query_param(&req, "model").unwrap_or_else(|| "gpt-4o-mini".to_string());
-    let body = serde_json::json!({
-        "message": message,
-        "model": model,
-        "error": "chat helper stream is currently unavailable; request was accepted by Rust handler"
+    let rpc_url: Uri = "https://api.devnet.solana.com".parse().unwrap();
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getBalance",
+        "params": [address]
     })
     .to_string();
 
-    Ok(build_json_response(StatusCode::OK, body))
+    let rpc_request = Request::builder()
+        .method(Method::POST)
+        .uri(rpc_url)
+        .header("content-type", "application/json")
+        .body(Body::from(payload))
+        .unwrap();
+
+    let response = match Client::new().send(rpc_request).await {
+        Ok(resp) => resp,
+        Err(err) => {
+            let body = serde_json::json!({ "error": format!("rpc request failed: {err}") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
+    let status = response.status();
+    let collected = match response.into_body().into_boxed_body().collect().await {
+        Ok(body) => body,
+        Err(err) => {
+            let body = serde_json::json!({ "error": format!("rpc body read failed: {err}") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
+    let text = String::from_utf8_lossy(collected.to_bytes().as_ref()).to_string();
+    Ok(build_json_response(status, text))
+}
+
+async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
+    let Some(api_key) = query_param(&req, "apiKey") else {
+        return bad_request("missing query param `apiKey`\n").await;
+    };
+
+    let Some(message) = query_param(&req, "message") else {
+        return bad_request("missing query param `message`\n").await;
+    };
+
+    let model = query_param(&req, "model").unwrap_or_else(|| "gpt-4o-mini".to_string());
+    let payload = serde_json::json!({
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": message,
+            }
+        ]
+    })
+    .to_string();
+
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri("https://api.openai.com/v1/chat/completions")
+        .header("authorization", format!("Bearer {api_key}"))
+        .header("content-type", "application/json")
+        .body(Body::from(payload))
+        .unwrap();
+
+    let response = match Client::new().send(request).await {
+        Ok(resp) => resp,
+        Err(err) => {
+            let body = serde_json::json!({ "error": format!("openai request failed: {err}") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
+    let status = response.status();
+    let collected = match response.into_body().into_boxed_body().collect().await {
+        Ok(body) => body,
+        Err(err) => {
+            let body = serde_json::json!({ "error": format!("openai body read failed: {err}") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
+    let text = String::from_utf8_lossy(collected.to_bytes().as_ref()).to_string();
+    Ok(build_json_response(status, text))
 }
 
 async fn bad_request(message: &str) -> Result<Response<Body>, Error> {
