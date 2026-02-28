@@ -32,7 +32,7 @@ async function getBalance(address) {
   try {
     address = sol.addressFromStr(address)
     const rpc = 'https://api.devnet.solana.com'
-    const ok = await sol.getBalance(address, rpc)
+    const ok = await sol.getBalance(rpc, address)
     return String(ok)
   } catch (err) {
     return JSON.stringify({ error: err.message })

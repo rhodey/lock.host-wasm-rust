@@ -51,7 +51,7 @@ import {
   createSolanaRpc,
 } from '@solana/kit'
 
-const getBalance = async (address, rpc) => {
+const getBalance = async (rpc, address) => {
   rpc = createSolanaRpc(rpc)
   const { value: lamports } = await rpc.getBalance(address).send()
   return Number(lamports)
@@ -70,7 +70,7 @@ import {
 
 import { getTransferSolInstruction } from '@solana-program/system'
 
-const transfer = async (signer, dest, amount, rpc) => {
+const transfer = async (rpc, signer, dest, amount) => {
   rpc = createSolanaRpc(rpc)
   const { value: latestBlockhash } = await rpc.getLatestBlockhash().send()
 
