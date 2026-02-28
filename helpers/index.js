@@ -11,10 +11,16 @@ function helperSolana(input) {
 }
 
 async function chatCompletion(apiKey, json) {
-  json = JSON.parse(json)
-  const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
-  const reply = await client.chat.completions.create(json)
-  return JSON.stringify(reply)
+  try {
+
+    json = JSON.parse(json)
+    const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
+    const reply = await client.chat.completions.create(json)
+    return JSON.stringify(reply)
+
+  } catch (err) {
+    return JSON.stringify({ error: err.message })
+  }
 }
 
 export const helpersInterface = {

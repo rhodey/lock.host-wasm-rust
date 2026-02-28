@@ -7,7 +7,7 @@
     "build": "npm run bundle && componentize-js dist/bundle.js --wit ../wit --world-name helpers --disable http fetch-event -o dist/bundle.wasm"
   },
   "devDependencies": {
-    "@bytecodealliance/componentize-js": "0.19.0",
+    "@bytecodealliance/componentize-js": "0.19.3",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "@rollup/plugin-replace": "^6.0.3",
     "rollup": "^4.50.1"
