@@ -26,15 +26,13 @@ async fn main(req: Request<IncomingBody>, res: Responder) -> Finished {
 }
 
 fn query_param(req: &Request<IncomingBody>, key: &str) -> Option<String> {
-    req.uri().query().and_then(|query| {
-        query.split('&').find_map(|pair| {
-            let (k, v) = pair.split_once('=')?;
-            if k == key {
-                Some(v.to_string())
-            } else {
-                None
-            }
-        })
+    let query = req.uri().query()?;
+    form_urlencoded::parse(query.as_bytes()).find_map(|(k, v)| {
+        if k == key {
+            Some(v.into_owned())
+        } else {
+            None
+        }
     })
 }
 
