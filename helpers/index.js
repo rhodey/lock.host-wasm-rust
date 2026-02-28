@@ -21,10 +21,9 @@ async function chatCompletion(apiKey, json) {
 
 async function getBalance(rpc, address) {
   console.log(123, address)
-  console.log(456, address)
   try {
-    address = String(address)
     address = sol.addressFromStr(address)
+    console.log(456, String(address))
     const ok = await sol.getBalance(rpc, address)
     return String(ok)
   } catch (err) {
