@@ -61,7 +61,8 @@ function fetchNative(url, apiKey, body) {
 function chatCompletion(apiKey, json) {
   const { stream, write, writeError } = createJsonStream()
 
-  fetchNative('https://api.openai.com/v1/chat/completions', apiKey, json)
+  Promise.resolve()
+    .then(() => fetchNative('https://api.openai.com/v1/chat/completions', apiKey, json))
     .then(write)
     .catch(writeError)
 

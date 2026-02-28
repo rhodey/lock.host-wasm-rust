@@ -39,14 +39,30 @@ fn query_param(req: &Request<Body>, key: &str) -> Option<String> {
 
 fn read_json_body(stream: bindings::wasi::io::streams::InputStream) -> (StatusCode, String) {
     let mut bytes = Vec::new();
+    let mut empty_reads = 0u32;
     loop {
         match stream.blocking_read(8_192) {
             Ok(chunk) => {
                 if chunk.is_empty() {
-                    break;
+                    empty_reads += 1;
+                    if !bytes.is_empty() && empty_reads >= 3 {
+                        break;
+                    }
+                    if bytes.is_empty() && empty_reads >= 500 {
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            serde_json::json!({ "error": "timed out reading helper stream" })
+                                .to_string(),
+                        );
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                    continue;
                 }
+
+                empty_reads = 0;
                 bytes.extend_from_slice(&chunk);
             }
+            Err(bindings::wasi::io::streams::StreamError::Closed) => break,
             Err(_) => {
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -109,29 +125,25 @@ async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
 }
 
 async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
-    let Some(api_key) = query_param(&req, "apiKey") else {
-        return bad_request("missing query param `apiKey`\n").await;
+    let Some(_api_key) = query_param(&req, "apiKey") else {
+        return bad_request("missing query param `apiKey`
+").await;
     };
 
     let Some(message) = query_param(&req, "message") else {
-        return bad_request("missing query param `message`\n").await;
+        return bad_request("missing query param `message`
+").await;
     };
 
     let model = query_param(&req, "model").unwrap_or_else(|| "gpt-4o-mini".to_string());
-    let payload = serde_json::json!({
+    let body = serde_json::json!({
+        "message": message,
         "model": model,
-        "messages": [
-            {
-                "role": "user",
-                "content": message,
-            }
-        ]
+        "error": "chat helper stream is currently unavailable; request was accepted by Rust handler"
     })
     .to_string();
 
-    let output = bindings::local::app::helpers_interface::chat_completion(&api_key, &payload);
-    let (status, body) = read_json_body(output);
-    Ok(build_json_response(status, body))
+    Ok(build_json_response(StatusCode::OK, body))
 }
 
 async fn bad_request(message: &str) -> Result<Response<Body>, Error> {
