@@ -31,6 +31,35 @@ async function safeFetch(input, init = {}) {
   return fetch(input, safeInit)
 }
 
+async function fallbackChatCompletion(apiKey, payload, sdkError) {
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+
+    const body = await response.text()
+    if (response.ok) {
+      return body
+    }
+
+    return JSON.stringify({
+      error: `OpenAI HTTP ${response.status}`,
+      body,
+      sdkError: sdkError?.message ?? String(sdkError),
+    })
+  } catch (fallbackErr) {
+    return JSON.stringify({
+      error: fallbackErr?.message ?? String(fallbackErr),
+      sdkError: sdkError?.message ?? String(sdkError),
+    })
+  }
+}
+
 async function chatCompletion(apiKey, json) {
   try {
     const payload = JSON.parse(json)
@@ -40,8 +69,12 @@ async function chatCompletion(apiKey, json) {
       fetch: safeFetch,
     })
 
-    const reply = await client.chat.completions.create(payload)
-    return JSON.stringify(reply)
+    try {
+      const reply = await client.chat.completions.create(payload)
+      return JSON.stringify(reply)
+    } catch (sdkErr) {
+      return await fallbackChatCompletion(apiKey, payload, sdkErr)
+    }
   } catch (err) {
     return JSON.stringify({ error: err?.message ?? String(err) })
   }
