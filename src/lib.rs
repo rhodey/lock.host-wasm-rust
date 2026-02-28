@@ -1,4 +1,4 @@
-use url::form_urlencoded;
+use form_urlencoded;
 use wstd::http::body::{BodyForthcoming, IncomingBody};
 use wstd::http::server::{Finished, Responder};
 use wstd::http::{IntoBody, Request, Response, StatusCode};
@@ -88,14 +88,8 @@ async fn chat_completion(req: Request<IncomingBody>, responder: Responder) -> Fi
     .to_string();
 
     let output = bindings::local::app::helpers_interface::chat_completion(&api_key, &payload);
-    let status = serde_json::from_str::<serde_json::Value>(&output)
-        .ok()
-        .and_then(|json| json.get("error").cloned())
-        .map(|_| StatusCode::BAD_REQUEST)
-        .unwrap_or(StatusCode::OK);
-
     let response = Response::builder()
-        .status(status)
+        .status(StatusCode::OK)
         .header("content-type", "application/json")
         .body(output.into_body())
         .unwrap();
