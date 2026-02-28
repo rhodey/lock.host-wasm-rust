@@ -4,6 +4,17 @@ use wstd::http::{IntoBody, Request, Response, StatusCode};
 use wstd::io::{copy, AsyncWrite};
 use wstd::time::{Duration, Instant};
 
+mod bindings {
+    wit_bindgen::generate!({
+        path: "./wit",
+        world: "app",
+    });
+}
+
+use bindings::local::app::helpers::{
+    helperOpenAI, helperSolana,
+};
+
 #[wstd::http_server]
 async fn main(req: Request<IncomingBody>, res: Responder) -> Finished {
     match req.uri().path_and_query().unwrap().as_str() {
