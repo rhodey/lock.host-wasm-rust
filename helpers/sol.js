@@ -94,4 +94,4 @@ const transfer = async (rpc, signer, dest, amount) => {
   return getSignatureFromTransaction(signedTx)
 }
 
-export default { addressFromStr, signerFromSeed, getBalance, transfer }
+export default { addressFromStr, getBalance, transfer }
