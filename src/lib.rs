@@ -24,7 +24,7 @@ mod bindings {
 
 #[wstd::http_server]
 async fn main(req: Request<IncomingBody>, res: Responder) -> Finished {
-    match req.uri().path_and_query().unwrap().as_str() {
+    match req.uri().path() {
         "/" => hi(req, res).await,
         "/wait" => wait(req, res).await,
         "/echo" => echo(req, res).await,
