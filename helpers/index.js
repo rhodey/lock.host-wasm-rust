@@ -1,37 +1,80 @@
-import OpenAI from 'openai'
+// import OpenAI from 'openai'
 import './shim.js'
 import sol from './sol.js'
+
+const pending = {}
+let next = 0n
+
+function poll(handle) {
+  const work = pending[handle]
+  if (!work) {
+    return JSON.stringify({ error: `No handle ${handle}` })
+  } else if (work instanceof Promise) {
+    return 'delay'
+  } else {
+    delete pending[handle]
+    return JSON.stringify(work)
+  }
+}
 
 async function fetchNative(url, apiKey, body) {
   const headers = { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' }
   const reply = await fetch(url, { method: 'POST', headers, body })
-  body = await reply.text()
-  if (reply.ok) { return body }
-  return JSON.stringify({ error: `OpenAI HTTP ${reply.status}` })
+  if (!reply.ok) { return { error: `HTTP ${reply.status}` } }
+  return reply.json()
 }
 
-async function chatCompletion(apiKey, json) {
-  try {
+function chatCompletion(apiKey, json) {
+  const handle = next++
+  const work = () => {
     const url = 'https://api.openai.com/v1/chat/completions'
-    return await fetchNative(url, apiKey, json)
-  } catch (err) {
-    return JSON.stringify({ error: err.message })
+    return fetchNative(url, apiKey, json)
   }
+  const cleanup = () => setTimeout(() => delete pending[handle], 5_000)
+  pending[handle] = work().then((obj) => {
+    pending[handle] = obj
+  }).catch((err) => {
+    pending[handle] = { error: err.message }
+  }).finally(cleanup)
+  return handle
 }
 
-async function getBalance(rpc, address) {
-  console.log(123, address)
-  try {
-    address = sol.addressFromStr(address)
-    console.log(456, String(address))
-    const ok = await sol.getBalance(rpc, address)
-    return String(ok)
-  } catch (err) {
-    return JSON.stringify({ error: err.message })
+const addressFromSeed = (seed) => sol.addressFromSeed(seed)
+
+function getBalance(rpc, address) {
+  const handle = next++
+  const work = async () => {
+    const lamports = await sol.getBalance(rpc, address)
+    return { lamports }
   }
+  const cleanup = () => setTimeout(() => delete pending[handle], 5_000)
+  pending[handle] = work().then((obj) => {
+    pending[handle] = obj
+  }).catch((err) => {
+    pending[handle] = { error: err.message }
+  }).finally(cleanup)
+  return handle
+}
+
+function transferFromSeed(rpc, seed, destination, amount) {
+  const handle = next++
+  const work = async () => {
+    const signature = await sol.transferFromSeed(rpc, seed, destinateion, amount)
+    return { signature }
+  }
+  const cleanup = () => setTimeout(() => delete pending[handle], 5_000)
+  pending[handle] = work().then((obj) => {
+    pending[handle] = obj
+  }).catch((err) => {
+    pending[handle] = { error: err.message }
+  }).finally(cleanup)
+  return handle
 }
 
 export const helpersInterface = {
+  poll,
   chatCompletion,
+  addressFromSeed,
   getBalance,
+  transferFromSeed,
 }

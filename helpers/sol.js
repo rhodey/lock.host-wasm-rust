@@ -17,6 +17,12 @@ const textSeed32 = (seed) => {
   return sha512(seed).slice(0, 32)
 }
 
+const addressFromSeed = (seed) => {
+  const priv = textSeed32(seed)
+  const pub = ed.getPublicKey(priv)
+  return bs58.encode(pub)
+}
+
 const signerFromSeed = (seed) => {
   const priv = textSeed32(seed)
   const pub = ed.getPublicKey(priv)
@@ -46,6 +52,7 @@ import {
 
 const getBalance = async (rpc, address) => {
   rpc = createSolanaRpc(rpc)
+  address = addressFromStr(address)
   const { value: lamports } = await rpc.getBalance(address).send()
   return Number(lamports)
 }
@@ -63,14 +70,15 @@ import {
 
 import { getTransferSolInstruction } from '@solana-program/system'
 
-const transfer = async (rpc, signer, dest, amount) => {
+const transferFromSeed = async (rpc, seed, destination, amount) => {
   rpc = createSolanaRpc(rpc)
+  const signer = signerFromSeed(seed)
   const { value: latestBlockhash } = await rpc.getLatestBlockhash().send()
 
   amount = lamports(BigInt(amount))
   const ix = getTransferSolInstruction({
     source: signer,
-    destination: dest,
+    destination,
     amount
   })
 
@@ -87,4 +95,4 @@ const transfer = async (rpc, signer, dest, amount) => {
   return getSignatureFromTransaction(signedTx)
 }
 
-export default { addressFromStr, getBalance, transfer }
+export default { addressFromSeed, getBalance, transferFromSeed }

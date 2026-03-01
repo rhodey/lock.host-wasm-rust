@@ -1,8 +1,11 @@
 package local:app;
 
 interface helpers-interface {
-  chat-completion: func(api-key: string, json: string) -> string;
-  get-balance: func(rpc: string, address: string) -> string;
+  poll: func(amount: s64) -> string;
+  chat-completion: func(api-key: string, json: string) -> s64;
+  address-from-seed: func(seed: string) -> string;
+  get-balance: func(rpc: string, address: string) -> s64;
+  transfer-from-seed: func(rpc: string, seed: string, destination: string, amount: s64) -> s64;
 }
 
 world helpers {
