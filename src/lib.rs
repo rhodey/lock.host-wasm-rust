@@ -127,8 +127,18 @@ async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
         }
     };
 
-    // todo: shape
-    Ok(build_json_response(StatusCode::OK, json))
+    let json: Value = serde_json::from_str(&json)?;
+    let lamports: i64 = match json["result"]["value"].as_i64() {
+        Some(value) => value,
+        None => {
+            let body = serde_json::json!({ "error": format!("bad value") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
+    let sol = (lamports as f64) / 1_000_000_000.0;
+    let body = serde_json::json!({ "addr": address, "balance": sol }).to_string();
+    Ok(build_json_response(StatusCode::OK, body))
 }
 
 async fn get_joke(req: Request<Body>) -> Result<Response<Body>, Error> {
