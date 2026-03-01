@@ -1,0 +1,14 @@
+package local:app;
+
+interface helpers-interface {
+  address-from-seed: func(seed: string) -> string;
+  transfer-from-seed: func(seed: string, destination: string, amount: s64, last-block: string, last-height: s64) -> string;
+}
+
+world helpers {
+  export helpers-interface;
+}
+
+world app {
+  import helpers-interface;
+}
