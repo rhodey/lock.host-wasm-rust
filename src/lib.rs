@@ -63,7 +63,7 @@ async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
     })
     .to_string();
 
-    // todo: make convenient function for all this
+    // todo: make convenient function for get string result from rpc
     let rpc_request = Request::builder()
         .method(Method::POST)
         .uri(rpc_url)
@@ -106,7 +106,7 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
     })
     .to_string();
 
-    // todo: make convenient function for all this
+    // todo: make convenient function for get string result from rpc
     let rpc_request = Request::builder()
         .method(Method::POST)
         .uri(rpc_url)
@@ -164,7 +164,7 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
     })
     .to_string();
 
-    // todo: make convenient function for all this
+    // todo: make convenient function for get string result from rpc
     let rpc_request = Request::builder()
         .method(Method::POST)
         .uri(rpc_url)
