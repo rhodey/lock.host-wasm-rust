@@ -50,13 +50,15 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   appendTransactionMessageInstructions,
   signTransactionMessageWithSigners,
+  getBase64EncodedWireTransaction,
   getSignatureFromTransaction,
 } from '@solana/kit'
 
 import { getTransferSolInstruction } from '@solana-program/system'
 
-const transferFromSeed = async (seed, destination, amount, lastBlock) => {
+const transferFromSeed = async (seed, destination, amount, lastBlock, lastHeight) => {
   const signer = signerFromSeed(seed)
+  destination = address(destination)
   amount = lamports(BigInt(amount))
 
   const ix = getTransferSolInstruction({
@@ -65,6 +67,11 @@ const transferFromSeed = async (seed, destination, amount, lastBlock) => {
     amount
   })
 
+  lastBlock = {
+    blockhash: lastBlock,
+    lastValidBlockHeight: lastHeight
+  }
+
   const txMessage = pipe(
     createTransactionMessage({ version: 0 }),
     (tx) => setTransactionMessageFeePayerSigner(signer, tx),
@@ -72,9 +79,10 @@ const transferFromSeed = async (seed, destination, amount, lastBlock) => {
     (tx) => appendTransactionMessageInstructions([ix], tx),
   )
 
-  const signedTx = await signTransactionMessageWithSigners(txMessage)
+  let signedTx = await signTransactionMessageWithSigners(txMessage)
   const signature = getSignatureFromTransaction(signedTx)
-  return [signedTx, signature]
+  signedTx = getBase64EncodedWireTransaction(signedTx)
+  return { signedTx, signature }
 }
 
 export default { addressFromSeed, transferFromSeed }
