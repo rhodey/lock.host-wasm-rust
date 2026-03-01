@@ -1,8 +1,6 @@
 use form_urlencoded;
-use wstd::http::body::{BodyForthcoming, IncomingBody};
-use wstd::http::server::{Finished, Responder};
-use wstd::http::{IntoBody, Request, Response, StatusCode};
-use wstd::io::{copy, AsyncWrite};
+use wstd::http::body::Body;
+use wstd::http::{Error, Request, Response, StatusCode};
 use wstd::time::{Duration, Instant};
 
 mod bindings {
@@ -13,19 +11,19 @@ mod bindings {
 }
 
 #[wstd::http_server]
-async fn main(req: Request<IncomingBody>, res: Responder) -> Finished {
+async fn main(req: Request<Body>) -> Result<Response<Body>, Error> {
     match req.uri().path() {
-        "/" => hi(req, res).await,
-        "/wait" => wait(req, res).await,
-        "/echo" => echo(req, res).await,
-        "/echo-headers" => echo_headers(req, res).await,
-        "/api/chat-completion" => chat_completion(req, res).await,
-        "/api/get-balance" => get_balance(req, res).await,
-        _ => not_found(req, res).await,
+        "/" => hi(req).await,
+        "/wait" => wait(req).await,
+        "/echo" => echo(req).await,
+        "/echo-headers" => echo_headers(req).await,
+        "/api/chat-completion" => chat_completion(req).await,
+        "/api/get-balance" => get_balance(req).await,
+        _ => not_found(req).await,
     }
 }
 
-fn query_param(req: &Request<IncomingBody>, key: &str) -> Option<String> {
+fn query_param(req: &Request<Body>, key: &str) -> Option<String> {
     req.uri().query().and_then(|query| {
         form_urlencoded::parse(query.as_bytes()).find_map(|(k, v)| {
             if k == key {
@@ -37,35 +35,33 @@ fn query_param(req: &Request<IncomingBody>, key: &str) -> Option<String> {
     })
 }
 
-async fn get_balance(req: Request<IncomingBody>, responder: Responder) -> Finished {
+async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
     let rpc = "https://api.devnet.solana.com";
     let Some(input) = query_param(&req, "addr") else {
-        return bad_request(responder, "missing query param `addr`\n").await;
+        return bad_request("missing query param `addr`\n").await;
     };
 
     let handle = bindings::local::app::helpers_interface::get_balance(&rpc, &input);
     let output = poll_until_ready(handle).await;
     let is_error = is_error_json(&output);
 
-    let response = Response::builder()
+    Ok(Response::builder()
         .status(if is_error {
             StatusCode::INTERNAL_SERVER_ERROR
         } else {
             StatusCode::OK
         })
         .header("content-type", "application/json")
-        .body(output.into_body())
-        .unwrap();
-    responder.respond(response).await
+        .body(output.into())?)
 }
 
-async fn chat_completion(req: Request<IncomingBody>, responder: Responder) -> Finished {
+async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
     let Some(api_key) = query_param(&req, "apiKey") else {
-        return bad_request(responder, "missing query param `apiKey`\n").await;
+        return bad_request("missing query param `apiKey`\n").await;
     };
 
     let Some(message) = query_param(&req, "message") else {
-        return bad_request(responder, "missing query param `message`\n").await;
+        return bad_request("missing query param `message`\n").await;
     };
 
     let model = query_param(&req, "model").unwrap_or_else(|| "gpt-4o-mini".to_string());
@@ -84,16 +80,14 @@ async fn chat_completion(req: Request<IncomingBody>, responder: Responder) -> Fi
     let output = poll_until_ready(handle).await;
     let is_error = is_error_json(&output);
 
-    let response = Response::builder()
+    Ok(Response::builder()
         .status(if is_error {
             StatusCode::INTERNAL_SERVER_ERROR
         } else {
             StatusCode::OK
         })
         .header("content-type", "application/json")
-        .body(output.into_body())
-        .unwrap();
-    responder.respond(response).await
+        .body(output.into())?)
 }
 
 async fn poll_until_ready(handle: i64) -> String {
@@ -118,56 +112,41 @@ fn is_error_json(output: &str) -> bool {
     )
 }
 
-async fn bad_request(responder: Responder, message: &str) -> Finished {
-    let res = Response::builder()
+async fn bad_request(message: &str) -> Result<Response<Body>, Error> {
+    Ok(Response::builder()
         .status(StatusCode::BAD_REQUEST)
-        .body(message.to_string().into_body())
-        .unwrap();
-    responder.respond(res).await
+        .body(message.to_string().into())?)
 }
 
-async fn hi(_req: Request<IncomingBody>, res: Responder) -> Finished {
-    res.respond(Response::new("hi!\n".into_body())).await
+async fn hi(_req: Request<Body>) -> Result<Response<Body>, Error> {
+    Ok(Response::new("hi!\n".to_string().into()))
 }
 
-async fn not_found(_req: Request<IncomingBody>, responder: Responder) -> Finished {
-    let res = Response::builder()
+async fn not_found(_req: Request<Body>) -> Result<Response<Body>, Error> {
+    Ok(Response::builder()
         .status(StatusCode::NOT_FOUND)
-        .body("404\n".into_body())
-        .unwrap();
-    responder.respond(res).await
+        .body("404\n".to_string().into())?)
 }
 
-async fn wait(_req: Request<IncomingBody>, res: Responder) -> Finished {
-    // Get the time now
+async fn wait(_req: Request<Body>) -> Result<Response<Body>, Error> {
     let now = Instant::now();
-
-    // Sleep for one second.
     wstd::task::sleep(Duration::from_secs(1)).await;
-
-    // Compute how long we slept for.
     let elapsed = Instant::now().duration_since(now).as_millis();
-
-    // To stream data to the response body, use `res::start_response`.
-    let mut body = res.start_response(Response::new(BodyForthcoming));
-    let result = body
-        .write_all(format!("slept for {elapsed} millis\n").as_bytes())
-        .await;
-    Finished::finish(body, result, None)
+    Ok(Response::new(
+        format!("slept for {elapsed} millis\n").into(),
+    ))
 }
 
-async fn echo(mut req: Request<IncomingBody>, res: Responder) -> Finished {
-    // Stream data from the req body to the response body.
-    let mut body = res.start_response(Response::new(BodyForthcoming));
-    let result = copy(req.body_mut(), &mut body).await;
-    Finished::finish(body, result, None)
+async fn echo(req: Request<Body>) -> Result<Response<Body>, Error> {
+    let (_parts, body) = req.into_parts();
+    Ok(Response::new(body))
 }
 
-async fn echo_headers(req: Request<IncomingBody>, responder: Responder) -> Finished {
+async fn echo_headers(req: Request<Body>) -> Result<Response<Body>, Error> {
     let (parts, _body) = req.into_parts();
     let mut headers_json: std::collections::BTreeMap<String, Vec<String>> =
         std::collections::BTreeMap::new();
-    for (name, value) in parts.headers.iter() {
+    for (name, value) in &parts.headers {
         let key = name.as_str().to_string();
         let val = match value.to_str() {
             Ok(s) => s.to_string(),
@@ -177,10 +156,8 @@ async fn echo_headers(req: Request<IncomingBody>, responder: Responder) -> Finis
     }
 
     let body = serde_json::to_string_pretty(&headers_json).unwrap_or_else(|_| "{}".to_string());
-    let res = Response::builder()
+    Ok(Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "application/json")
-        .body(body.into_body())
-        .unwrap();
-    responder.respond(res).await
+        .body(body.into())?)
 }
