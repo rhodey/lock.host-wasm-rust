@@ -46,11 +46,15 @@ fn build_json_response(status: StatusCode, body: String) -> Response<Body> {
 }
 
 async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
-    // let rpc = "https://api.devnet.solana.com";
-    let Some(address) = query_param(&req, "addr") else {
-        return bad_request("missing query param `addr`\n").await;
+    let address = match query_param(&req, "addr") {
+        Some(address) => address,
+        None => {
+          let seed = "persistent keys arrive soon";
+          bindings::local::app::helpers_interface::address_from_seed(&seed)
+        }
     };
 
+    // todo: get rpc_url from environment variable
     let rpc_url: Uri = "https://api.devnet.solana.com".parse().unwrap();
     let payload = serde_json::json!({
         "jsonrpc": "2.0", "id": 1,
@@ -59,6 +63,7 @@ async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
     })
     .to_string();
 
+    // todo: make convenient function for all this
     let rpc_request = Request::builder()
         .method(Method::POST)
         .uri(rpc_url)
@@ -88,13 +93,11 @@ async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
 }
 
 async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
-    let seed = "persistent keys arrive soon";
-    let to = "CFf6SMjR3eNKR7me9CGHhRNE1SwSQaPi5r4MWZQFGB2W";
+    let Some(to) = query_param(&req, "addr") else {
+        return bad_request("missing query param `addr`\n").await;
+    };
 
-    let from = bindings::local::app::helpers_interface::address_from_seed(&seed);
-    println!("from => {from}");
-    println!("to => {to}");
-
+    // todo: get rpc_url from environment variable
     let rpc_url: Uri = "https://api.devnet.solana.com".parse().unwrap();
     let payload = serde_json::json!({
         "jsonrpc": "2.0", "id": 1,
@@ -103,6 +106,7 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
     })
     .to_string();
 
+    // todo: make convenient function for all this
     let rpc_request = Request::builder()
         .method(Method::POST)
         .uri(rpc_url)
@@ -127,11 +131,8 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
     };
 
     let text = String::from_utf8_lossy(collected.to_bytes().as_ref()).to_string();
-    println!("rpc => {text}");
-
-    let v: Value = serde_json::from_str(&text)?;
-
-    let blockhash: String = match v["result"]["value"]["blockhash"].as_str() {
+    let json: Value = serde_json::from_str(&text)?;
+    let blockhash: String = match json["result"]["value"]["blockhash"].as_str() {
         Some(value) => value.to_string(),
         None => {
             let body = serde_json::json!({ "error": format!("solana rpc blockhash none") }).to_string();
@@ -139,9 +140,7 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
         }
 
     };
-    println!("hash => {blockhash}");
-
-    let height: i64 = match v["result"]["value"]["lastValidBlockHeight"].as_i64() {
+    let height: i64 = match json["result"]["value"]["lastValidBlockHeight"].as_i64() {
         Some(value) => value,
         None => {
             let body = serde_json::json!({ "error": format!("solana rpc block hight none") }).to_string();
@@ -149,15 +148,14 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
         }
 
     };
-    println!("height => {height}");
 
+    let seed = "persistent keys arrive soon";
     let transfer = bindings::local::app::helpers_interface::transfer_from_seed(&seed, &to, 1_000_000, &blockhash, height);
-    println!("transfer => {transfer}");
-
     let mut transfer = transfer.split(',');
     let signed_tx = transfer.next().unwrap_or("empty");
     let signature = transfer.next().unwrap_or("empty");
 
+    // todo: get rpc_url from environment variable
     let rpc_url: Uri = "https://api.devnet.solana.com".parse().unwrap();
     let payload = serde_json::json!({
         "jsonrpc": "2.0", "id": 2,
@@ -166,6 +164,7 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
     })
     .to_string();
 
+    // todo: make convenient function for all this
     let rpc_request = Request::builder()
         .method(Method::POST)
         .uri(rpc_url)
@@ -191,8 +190,6 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
     };
 
     let text = String::from_utf8_lossy(collected.to_bytes().as_ref()).to_string();
-    println!("rpc2 => {text}");
-
     Ok(build_json_response(status, text))
 }
 
