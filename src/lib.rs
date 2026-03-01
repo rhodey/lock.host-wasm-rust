@@ -50,31 +50,43 @@ fn solana_rpc_url() -> String {
     env::var("SOLANA_RPC_URL").unwrap_or_else(|_| "https://api.devnet.solana.com".to_string())
 }
 
-async fn send_json_rpc(payload: String) -> Result<String, String> {
-    let rpc_url: Uri = solana_rpc_url()
-        .parse()
-        .map_err(|err| format!("invalid SOLANA_RPC_URL: {err}"))?;
-
-    let rpc_request = Request::builder()
+async fn send_json(uri: Uri, payload: String) -> Result<String, String> {
+    let mut request_builder = Request::builder()
         .method(Method::POST)
-        .uri(rpc_url)
-        .header("content-type", "application/json")
+        .uri(uri.clone())
+        .header("content-type", "application/json");
+
+    if uri.authority().map(|auth| auth.as_str()) == Some("api.openai.com") {
+        if let Ok(api_key) = env::var("OPENAI_API_KEY") {
+            request_builder = request_builder.header("authorization", format!("Bearer {api_key}"));
+        }
+    }
+
+    let request = request_builder
         .body(Body::from(payload))
-        .map_err(|err| format!("failed to build rpc request: {err}"))?;
+        .map_err(|err| format!("failed to build request: {err}"))?;
 
     let response = Client::new()
-        .send(rpc_request)
+        .send(request)
         .await
-        .map_err(|err| format!("solana rpc failed: {err}"))?;
+        .map_err(|err| format!("http request failed: {err}"))?;
 
     let collected = response
         .into_body()
         .into_boxed_body()
         .collect()
         .await
-        .map_err(|err| format!("solana rpc read failed: {err}"))?;
+        .map_err(|err| format!("http response read failed: {err}"))?;
 
     Ok(String::from_utf8_lossy(collected.to_bytes().as_ref()).to_string())
+}
+
+async fn send_json_rpc(payload: String) -> Result<String, String> {
+    let rpc_url: Uri = solana_rpc_url()
+        .parse()
+        .map_err(|err| format!("invalid SOLANA_RPC_URL: {err}"))?;
+
+    send_json(rpc_url, payload).await
 }
 
 async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
@@ -168,9 +180,9 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
 }
 
 async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
-    let Some(api_key) = query_param(&req, "apiKey") else {
-        return bad_request("missing query param `apiKey`\n").await;
-    };
+    if let Some(api_key) = query_param(&req, "apiKey") {
+        env::set_var("OPENAI_API_KEY", api_key);
+    }
 
     let Some(message) = query_param(&req, "message") else {
         return bad_request("missing query param `message`\n").await;
@@ -183,35 +195,18 @@ async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
     })
     .to_string();
 
-    let request = Request::builder()
-        .method(Method::POST)
-        .uri("https://api.openai.com/v1/chat/completions")
-        .header("authorization", format!("Bearer {api_key}"))
-        .header("content-type", "application/json")
-        .body(Body::from(payload))
+    let uri: Uri = "https://api.openai.com/v1/chat/completions"
+        .parse()
         .unwrap();
-
-    let response = match Client::new().send(request).await {
-        Ok(resp) => resp,
+    let text = match send_json(uri, payload).await {
+        Ok(text) => text,
         Err(err) => {
-            let body =
-                serde_json::json!({ "error": format!("openai http failed: {err}") }).to_string();
+            let body = serde_json::json!({ "error": err }).to_string();
             return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
         }
     };
 
-    let status = response.status();
-    let collected = match response.into_body().into_boxed_body().collect().await {
-        Ok(body) => body,
-        Err(err) => {
-            let body = serde_json::json!({ "error": format!("openai http read failed: {err}") })
-                .to_string();
-            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
-        }
-    };
-
-    let text = String::from_utf8_lossy(collected.to_bytes().as_ref()).to_string();
-    Ok(build_json_response(status, text))
+    Ok(build_json_response(StatusCode::OK, text))
 }
 
 async fn bad_request(message: &str) -> Result<Response<Body>, Error> {
