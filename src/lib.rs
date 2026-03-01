@@ -1,5 +1,6 @@
 use form_urlencoded;
 use serde_json::Value;
+use std::env;
 use wstd::http::body::Body;
 use wstd::http::{BodyExt, Client, Error, Method, Request, Response, StatusCode, Uri};
 use wstd::time::{Duration, Instant};
@@ -45,17 +46,46 @@ fn build_json_response(status: StatusCode, body: String) -> Response<Body> {
         .unwrap()
 }
 
+fn solana_rpc_url() -> String {
+    env::var("SOLANA_RPC_URL").unwrap_or_else(|_| "https://api.devnet.solana.com".to_string())
+}
+
+async fn send_json_rpc(payload: String) -> Result<String, String> {
+    let rpc_url: Uri = solana_rpc_url()
+        .parse()
+        .map_err(|err| format!("invalid SOLANA_RPC_URL: {err}"))?;
+
+    let rpc_request = Request::builder()
+        .method(Method::POST)
+        .uri(rpc_url)
+        .header("content-type", "application/json")
+        .body(Body::from(payload))
+        .map_err(|err| format!("failed to build rpc request: {err}"))?;
+
+    let response = Client::new()
+        .send(rpc_request)
+        .await
+        .map_err(|err| format!("solana rpc failed: {err}"))?;
+
+    let collected = response
+        .into_body()
+        .into_boxed_body()
+        .collect()
+        .await
+        .map_err(|err| format!("solana rpc read failed: {err}"))?;
+
+    Ok(String::from_utf8_lossy(collected.to_bytes().as_ref()).to_string())
+}
+
 async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
     let address = match query_param(&req, "addr") {
         Some(address) => address,
         None => {
-          let seed = "persistent keys arrive soon";
-          bindings::local::app::helpers_interface::address_from_seed(&seed)
+            let seed = "persistent keys arrive soon";
+            bindings::local::app::helpers_interface::address_from_seed(&seed)
         }
     };
 
-    // todo: get rpc_url from environment variable
-    let rpc_url: Uri = "https://api.devnet.solana.com".parse().unwrap();
     let payload = serde_json::json!({
         "jsonrpc": "2.0", "id": 1,
         "method": "getBalance",
@@ -63,33 +93,15 @@ async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
     })
     .to_string();
 
-    // todo: make convenient function for get string result from rpc
-    let rpc_request = Request::builder()
-        .method(Method::POST)
-        .uri(rpc_url)
-        .header("content-type", "application/json")
-        .body(Body::from(payload))
-        .unwrap();
-
-    let response = match Client::new().send(rpc_request).await {
-        Ok(resp) => resp,
+    let text = match send_json_rpc(payload).await {
+        Ok(text) => text,
         Err(err) => {
-            let body = serde_json::json!({ "error": format!("solana rpc failed: {err}") }).to_string();
+            let body = serde_json::json!({ "error": err }).to_string();
             return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
         }
     };
 
-    let status = response.status();
-    let collected = match response.into_body().into_boxed_body().collect().await {
-        Ok(body) => body,
-        Err(err) => {
-            let body = serde_json::json!({ "error": format!("solana rpc read failed: {err}") }).to_string();
-            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
-        }
-    };
-
-    let text = String::from_utf8_lossy(collected.to_bytes().as_ref()).to_string();
-    Ok(build_json_response(status, text))
+    Ok(build_json_response(StatusCode::OK, text))
 }
 
 async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
@@ -97,8 +109,6 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
         return bad_request("missing query param `addr`\n").await;
     };
 
-    // todo: get rpc_url from environment variable
-    let rpc_url: Uri = "https://api.devnet.solana.com".parse().unwrap();
     let payload = serde_json::json!({
         "jsonrpc": "2.0", "id": 1,
         "method": "getLatestBlockhash",
@@ -106,57 +116,39 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
     })
     .to_string();
 
-    // todo: make convenient function for get string result from rpc
-    let rpc_request = Request::builder()
-        .method(Method::POST)
-        .uri(rpc_url)
-        .header("content-type", "application/json")
-        .body(Body::from(payload))
-        .unwrap();
-
-    let response = match Client::new().send(rpc_request).await {
-        Ok(resp) => resp,
+    let text = match send_json_rpc(payload).await {
+        Ok(text) => text,
         Err(err) => {
-            let body = serde_json::json!({ "error": format!("solana rpc failed: {err}") }).to_string();
+            let body = serde_json::json!({ "error": err }).to_string();
             return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
         }
     };
-
-    let collected = match response.into_body().into_boxed_body().collect().await {
-        Ok(body) => body,
-        Err(err) => {
-            let body = serde_json::json!({ "error": format!("solana rpc read failed: {err}") }).to_string();
-            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
-        }
-    };
-
-    let text = String::from_utf8_lossy(collected.to_bytes().as_ref()).to_string();
     let json: Value = serde_json::from_str(&text)?;
     let blockhash: String = match json["result"]["value"]["blockhash"].as_str() {
         Some(value) => value.to_string(),
         None => {
-            let body = serde_json::json!({ "error": format!("solana rpc blockhash none") }).to_string();
+            let body =
+                serde_json::json!({ "error": format!("solana rpc blockhash none") }).to_string();
             return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
         }
-
     };
     let height: i64 = match json["result"]["value"]["lastValidBlockHeight"].as_i64() {
         Some(value) => value,
         None => {
-            let body = serde_json::json!({ "error": format!("solana rpc block hight none") }).to_string();
+            let body =
+                serde_json::json!({ "error": format!("solana rpc block hight none") }).to_string();
             return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
         }
-
     };
 
     let seed = "persistent keys arrive soon";
-    let transfer = bindings::local::app::helpers_interface::transfer_from_seed(&seed, &to, 1_000_000, &blockhash, height);
+    let transfer = bindings::local::app::helpers_interface::transfer_from_seed(
+        &seed, &to, 1_000_000, &blockhash, height,
+    );
     let mut transfer = transfer.split(',');
     let signed_tx = transfer.next().unwrap_or("empty");
-    let signature = transfer.next().unwrap_or("empty");
+    let _signature = transfer.next().unwrap_or("empty");
 
-    // todo: get rpc_url from environment variable
-    let rpc_url: Uri = "https://api.devnet.solana.com".parse().unwrap();
     let payload = serde_json::json!({
         "jsonrpc": "2.0", "id": 2,
         "method": "sendTransaction",
@@ -164,33 +156,15 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
     })
     .to_string();
 
-    // todo: make convenient function for get string result from rpc
-    let rpc_request = Request::builder()
-        .method(Method::POST)
-        .uri(rpc_url)
-        .header("content-type", "application/json")
-        .body(Body::from(payload))
-        .unwrap();
-
-    let response = match Client::new().send(rpc_request).await {
-        Ok(resp) => resp,
+    let text = match send_json_rpc(payload).await {
+        Ok(text) => text,
         Err(err) => {
-            let body = serde_json::json!({ "error": format!("solana rpc2 failed: {err}") }).to_string();
+            let body = serde_json::json!({ "error": err }).to_string();
             return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
         }
     };
 
-    let status = response.status();
-    let collected = match response.into_body().into_boxed_body().collect().await {
-        Ok(body) => body,
-        Err(err) => {
-            let body = serde_json::json!({ "error": format!("solana rpc2 read failed: {err}") }).to_string();
-            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
-        }
-    };
-
-    let text = String::from_utf8_lossy(collected.to_bytes().as_ref()).to_string();
-    Ok(build_json_response(status, text))
+    Ok(build_json_response(StatusCode::OK, text))
 }
 
 async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
@@ -220,7 +194,8 @@ async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
     let response = match Client::new().send(request).await {
         Ok(resp) => resp,
         Err(err) => {
-            let body = serde_json::json!({ "error": format!("openai http failed: {err}") }).to_string();
+            let body =
+                serde_json::json!({ "error": format!("openai http failed: {err}") }).to_string();
             return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
         }
     };
@@ -229,7 +204,8 @@ async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
     let collected = match response.into_body().into_boxed_body().collect().await {
         Ok(body) => body,
         Err(err) => {
-            let body = serde_json::json!({ "error": format!("openai http read failed: {err}") }).to_string();
+            let body = serde_json::json!({ "error": format!("openai http read failed: {err}") })
+                .to_string();
             return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
         }
     };
