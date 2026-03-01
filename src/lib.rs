@@ -13,6 +13,7 @@ mod bindings {
 
 #[wstd::http_server]
 async fn main(req: Request<Body>) -> Result<Response<Body>, Error> {
+    // todo: wallet + joke
     match req.uri().path() {
         "/" => hi(req).await,
         "/api/chat-completion" => chat_completion(req).await,
