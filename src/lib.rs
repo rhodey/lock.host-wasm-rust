@@ -96,7 +96,8 @@ async fn poll_until_ready(handle: i64) -> String {
         if output != "delay" {
             return output;
         }
-        wstd::task::sleep(Duration::from_millis(100)).await;
+        println!("Delay");
+        wstd::task::sleep(Duration::from_millis(500)).await;
     }
 }
 
