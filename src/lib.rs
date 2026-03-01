@@ -1,6 +1,6 @@
-use std::env;
 use form_urlencoded;
 use serde_json::Value;
+use std::env;
 use wstd::http::body::Body;
 use wstd::http::{BodyExt, Client, Error, Method, Request, Response, StatusCode, Uri};
 
@@ -16,9 +16,8 @@ async fn main(req: Request<Body>) -> Result<Response<Body>, Error> {
     // todo: wallet + joke
     match req.uri().path() {
         "/" => hi(req).await,
-        "/api/chat-completion" => chat_completion(req).await,
-        "/api/get-balance" => get_balance(req).await,
-        "/api/get-transfer" => get_transfer(req).await,
+        "/api/balance" => get_balance(req).await,
+        "/api/joke" => get_joke(req).await,
         _ => not_found(req).await,
     }
 }
@@ -67,7 +66,8 @@ async fn send_json(uri: Uri, payload: String) -> Result<String, String> {
 
     if uri.authority().map(|auth| auth.as_str()) == Some("api.openai.com") {
         if let Ok(openai_key) = env::var("openai_key") {
-            request_builder = request_builder.header("authorization", format!("Bearer {openai_key}"));
+            request_builder =
+                request_builder.header("authorization", format!("Bearer {openai_key}"));
         }
     }
 
@@ -91,8 +91,8 @@ async fn send_json(uri: Uri, payload: String) -> Result<String, String> {
 }
 
 async fn send_json_rpc(payload: String) -> Result<String, String> {
-    let rpc_url: String = env::var("solana_net")
-        .map_err(|_err| format!("invalid solana_net env"))?;
+    let rpc_url: String =
+        env::var("solana_net").map_err(|_err| format!("invalid solana_net env"))?;
 
     let rpc_url: Uri = rpc_url
         .parse()
@@ -131,10 +131,61 @@ async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
     Ok(build_json_response(StatusCode::OK, text))
 }
 
-async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
+async fn get_joke(req: Request<Body>) -> Result<Response<Body>, Error> {
+    let Some(message) = query_param(&req, "message") else {
+        return bad_request("missing query param `message`\n").await;
+    };
     let Some(destination) = query_param(&req, "addr") else {
         return bad_request("missing query param `addr`\n").await;
     };
+
+    let payload = serde_json::json!({
+        "model": "gpt-4o-mini",
+        "tools": [{
+            "type": "function",
+            "function": {
+                "name": "record_if_joke_is_funny",
+                "description": "Record if joke is funny",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "thoughts": { "type": "string" },
+                        "decision": {
+                            "type": "string",
+                            "enum": ["funny", "not"],
+                        },
+                    },
+                    "required": ["thoughts", "decision"],
+                    "additionalProperties": false,
+                },
+                "strict": true,
+            },
+        }],
+        "tool_choice": {
+            "type": "function",
+            "function": {
+                "name": "record_if_joke_is_funny",
+            },
+        },
+        "messages": [
+            { "role": "system", "content": "You are to decide if a joke is funny or not" },
+            { "role": "user", "content": message },
+        ]
+    })
+    .to_string();
+
+    let uri: Uri = "https://api.openai.com/v1/chat/completions"
+        .parse()
+        .unwrap();
+
+    let text = match send_json(uri, payload).await {
+        Ok(text) => text,
+        Err(err) => {
+            let body = serde_json::json!({ "error": err }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+    println!("text =>> {text}");
 
     let payload = serde_json::json!({
         "jsonrpc": "2.0", "id": 1,
@@ -162,14 +213,19 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
     let height: i64 = match json["result"]["value"]["lastValidBlockHeight"].as_i64() {
         Some(value) => value,
         None => {
-            let body = serde_json::json!({ "error": format!("bad lastValidBlockHeight") }).to_string();
+            let body =
+                serde_json::json!({ "error": format!("bad lastValidBlockHeight") }).to_string();
             return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
         }
     };
 
     let seed = "persistent keys arrive soon";
     let transfer = bindings::local::app::helpers_interface::transfer_from_seed(
-        &seed, &destination, 1_000_000, &blockhash, height,
+        &seed,
+        &destination,
+        1_000_000,
+        &blockhash,
+        height,
     );
     let mut transfer = transfer.split(',');
     let signed_tx = transfer.next().unwrap_or("empty");
@@ -191,30 +247,5 @@ async fn get_transfer(req: Request<Body>) -> Result<Response<Body>, Error> {
     };
 
     // todo: shape
-    Ok(build_json_response(StatusCode::OK, text))
-}
-
-async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
-    let Some(message) = query_param(&req, "message") else {
-        return bad_request("missing query param `message`\n").await;
-    };
-
-    let payload = serde_json::json!({
-        "model": "gpt-4o-mini",
-        "messages": [{ "role": "user", "content": message }]
-    })
-    .to_string();
-
-    let uri: Uri = "https://api.openai.com/v1/chat/completions"
-        .parse()
-        .unwrap();
-    let text = match send_json(uri, payload).await {
-        Ok(text) => text,
-        Err(err) => {
-            let body = serde_json::json!({ "error": err }).to_string();
-            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
-        }
-    };
-
     Ok(build_json_response(StatusCode::OK, text))
 }
