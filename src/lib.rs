@@ -187,6 +187,48 @@ async fn get_joke(req: Request<Body>) -> Result<Response<Body>, Error> {
     };
     println!("text =>> {text}");
 
+    let json: Value = serde_json::from_str(&text)?;
+
+    let tool_call: String = match json["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"].as_str() {
+        Some(value) => value.to_string(),
+        None => {
+            let body = serde_json::json!({ "error": format!("bad tool_call") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
+    println!("tool_call =>> {tool_call}");
+    let tool_call: Value = serde_json::from_str(&tool_call)?;
+
+    let thoughts: String = match tool_call["thoughts"].as_str() {
+        Some(value) => value.to_string(),
+        None => {
+            let body = serde_json::json!({ "error": format!("bad tool_call thoughts") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+    println!("thoughts =>> {thoughts}");
+
+    let decision: String = match tool_call["decision"].as_str() {
+        Some(value) => value.to_string(),
+        None => {
+            let body = serde_json::json!({ "error": format!("bad tool_call decision") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+    println!("decision =>> {decision}");
+
+    if decision != "funny" {
+        let body = serde_json::json!({ "thoughts": thoughts }).to_string();
+        return Ok(build_json_response(StatusCode::OK, body))
+    }
+
+    let seed = "persistent keys arrive soon";
+    let from = bindings::local::app::helpers_interface::address_from_seed(&seed);
+    let body = serde_json::json!({ "from": from, "to": destination, "thoughts": thoughts }).to_string();
+    Ok(build_json_response(StatusCode::OK, body))
+
+    /*
     let payload = serde_json::json!({
         "jsonrpc": "2.0", "id": 1,
         "method": "getLatestBlockhash",
@@ -245,7 +287,8 @@ async fn get_joke(req: Request<Body>) -> Result<Response<Body>, Error> {
             return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
         }
     };
+    */
 
     // todo: shape
-    Ok(build_json_response(StatusCode::OK, text))
+    // Ok(build_json_response(StatusCode::OK, text))
 }
