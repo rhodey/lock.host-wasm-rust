@@ -1,6 +1,6 @@
 use form_urlencoded;
 use wstd::http::body::Body;
-use wstd::http::{Error, Request, Response, StatusCode};
+use wstd::http::{BodyExt, Client, Error, Method, Request, Response, StatusCode, Uri};
 use wstd::time::{Duration, Instant};
 
 mod bindings {
@@ -35,24 +35,57 @@ fn query_param(req: &Request<Body>, key: &str) -> Option<String> {
     })
 }
 
+fn build_json_response(status: StatusCode, body: String) -> Response<Body> {
+    Response::builder()
+        .status(status)
+        .header("content-type", "application/json")
+        .body(body.into())
+        .unwrap()
+}
+
 async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
-    let rpc = "https://api.devnet.solana.com";
-    let Some(input) = query_param(&req, "addr") else {
+    // let rpc = "https://api.devnet.solana.com";
+    let Some(address) = query_param(&req, "addr") else {
         return bad_request("missing query param `addr`\n").await;
     };
 
-    let handle = bindings::local::app::helpers_interface::get_balance(&rpc, &input);
-    let output = poll_until_ready(handle).await;
-    let is_error = is_error_json(&output);
+    let test = bindings::local::app::helpers_interface::address_from_seed(&"persistent keys arrive soon");
+    println!("seed => {test}");
 
-    Ok(Response::builder()
-        .status(if is_error {
-            StatusCode::INTERNAL_SERVER_ERROR
-        } else {
-            StatusCode::OK
-        })
+    let rpc_url: Uri = "https://api.devnet.solana.com".parse().unwrap();
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0", "id": 1,
+        "method": "getBalance",
+        "params": [address]
+    })
+    .to_string();
+
+    let rpc_request = Request::builder()
+        .method(Method::POST)
+        .uri(rpc_url)
         .header("content-type", "application/json")
-        .body(output.into())?)
+        .body(Body::from(payload))
+        .unwrap();
+
+    let response = match Client::new().send(rpc_request).await {
+        Ok(resp) => resp,
+        Err(err) => {
+            let body = serde_json::json!({ "error": format!("solana rpc failed: {err}") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
+    let status = response.status();
+    let collected = match response.into_body().into_boxed_body().collect().await {
+        Ok(body) => body,
+        Err(err) => {
+            let body = serde_json::json!({ "error": format!("solana rpc read failed: {err}") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
+    let text = String::from_utf8_lossy(collected.to_bytes().as_ref()).to_string();
+    Ok(build_json_response(status, text))
 }
 
 async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
@@ -67,50 +100,37 @@ async fn chat_completion(req: Request<Body>) -> Result<Response<Body>, Error> {
     let model = query_param(&req, "model").unwrap_or_else(|| "gpt-4o-mini".to_string());
     let payload = serde_json::json!({
         "model": model,
-        "messages": [
-            {
-                "role": "user",
-                "content": message,
-            }
-        ]
+        "messages": [{ "role": "user", "content": message }]
     })
     .to_string();
 
-    let handle = bindings::local::app::helpers_interface::chat_completion(&api_key, &payload);
-    let output = poll_until_ready(handle).await;
-    let is_error = is_error_json(&output);
-
-    Ok(Response::builder()
-        .status(if is_error {
-            StatusCode::INTERNAL_SERVER_ERROR
-        } else {
-            StatusCode::OK
-        })
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri("https://api.openai.com/v1/chat/completions")
+        .header("authorization", format!("Bearer {api_key}"))
         .header("content-type", "application/json")
-        .body(output.into())?)
-}
+        .body(Body::from(payload))
+        .unwrap();
 
-async fn poll_until_ready(handle: i64) -> String {
-    loop {
-        let output = bindings::local::app::helpers_interface::poll(handle);
-        if output != "delay" {
-            return output;
+    let response = match Client::new().send(request).await {
+        Ok(resp) => resp,
+        Err(err) => {
+            let body = serde_json::json!({ "error": format!("openai http failed: {err}") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
         }
-        println!("!! delay");
-        wstd::task::sleep(Duration::from_millis(1000)).await;
-    }
-}
-
-fn is_error_json(output: &str) -> bool {
-    let Ok(value) = serde_json::from_str::<serde_json::Value>(output) else {
-        return false;
     };
 
-    matches!(
-        value,
-        serde_json::Value::Object(ref map)
-            if map.len() == 1 && matches!(map.get("error"), Some(serde_json::Value::String(_)))
-    )
+    let status = response.status();
+    let collected = match response.into_body().into_boxed_body().collect().await {
+        Ok(body) => body,
+        Err(err) => {
+            let body = serde_json::json!({ "error": format!("openai http read failed: {err}") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
+    let text = String::from_utf8_lossy(collected.to_bytes().as_ref()).to_string();
+    Ok(build_json_response(status, text))
 }
 
 async fn bad_request(message: &str) -> Result<Response<Body>, Error> {

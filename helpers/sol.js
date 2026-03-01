@@ -10,8 +10,6 @@ ed.hashes.sha512 = sha512sync
 ed.etc.sha512Sync = sha512sync
 ed.etc.sha512Async = async (...m) => sha512sync(...m)
 
-const addressFromStr = (str) => address(str)
-
 const textSeed32 = (seed) => {
   seed = new TextEncoder().encode(seed)
   return sha512(seed).slice(0, 32)
@@ -46,36 +44,21 @@ const signerFromSeed = (seed) => {
 }
 
 import {
-  lamports,
-  createSolanaRpc,
-} from '@solana/kit'
-
-const getBalance = async (rpc, address) => {
-  rpc = createSolanaRpc(rpc)
-  address = addressFromStr(address)
-  const { value: lamports } = await rpc.getBalance(address).send()
-  return Number(lamports)
-}
-
-import {
-  pipe,
+  lamports, pipe,
   createTransactionMessage,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
   appendTransactionMessageInstructions,
   signTransactionMessageWithSigners,
-  sendTransactionWithoutConfirmingFactory,
   getSignatureFromTransaction,
 } from '@solana/kit'
 
 import { getTransferSolInstruction } from '@solana-program/system'
 
-const transferFromSeed = async (rpc, seed, destination, amount) => {
-  rpc = createSolanaRpc(rpc)
+const transferFromSeed = async (seed, destination, amount, lastBlock) => {
   const signer = signerFromSeed(seed)
-  const { value: latestBlockhash } = await rpc.getLatestBlockhash().send()
-
   amount = lamports(BigInt(amount))
+
   const ix = getTransferSolInstruction({
     source: signer,
     destination,
@@ -85,14 +68,13 @@ const transferFromSeed = async (rpc, seed, destination, amount) => {
   const txMessage = pipe(
     createTransactionMessage({ version: 0 }),
     (tx) => setTransactionMessageFeePayerSigner(signer, tx),
-    (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+    (tx) => setTransactionMessageLifetimeUsingBlockhash(lastBlock, tx),
     (tx) => appendTransactionMessageInstructions([ix], tx),
   )
 
   const signedTx = await signTransactionMessageWithSigners(txMessage)
-  const sendTx = sendTransactionWithoutConfirmingFactory({ rpc })
-  await sendTx(signedTx, { commitment: 'confirmed' })
-  return getSignatureFromTransaction(signedTx)
+  const signature = getSignatureFromTransaction(signedTx)
+  return [signedTx, signature]
 }
 
-export default { addressFromSeed, getBalance, transferFromSeed }
+export default { addressFromSeed, transferFromSeed }
