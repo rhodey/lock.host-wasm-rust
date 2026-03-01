@@ -1,7 +1,3 @@
-wkg:
-  cargo install wkg
-  wkg wit fetch
-
 helpers:
   npm --prefix helpers install
   npm --prefix helpers run build
