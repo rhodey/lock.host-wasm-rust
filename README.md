@@ -2,8 +2,8 @@
 Lock.host WASM Rust example, see [Lock.host](https://github.com/rhodey/lock.host)
 
 This demonstration uses OpenAI to control a Solana wallet:
-+ Unmodified OpenAI lib
-+ (Mostly) Unmodified Solana lib
++ OpenAI API calls
++ Solana API calls
 + Hit /api/joke?message=your best joke&addr=abc123
 + OAI is asked "You are to decide if a joke is funny or not"
 + If so 0.001 SOL is sent to addr
@@ -34,10 +34,12 @@ just joke 'why did the worker quit his job at the recycling factory? because it 
 > {"from":"DohcaGiBiC3yuPz4gHtoA7QJhyL5N7hk3EpnfFyHZR2S","signature":"2DF5yVe1dHoTa51RCDUDHzWGnNGbQVsmfieiQRn3hcYgADX4u8rezGrbVhfc4MwWKTiBBqjwaSGHkaueuzGTVXvq","thoughts":"The play on words with 'soda pressing' and 'so depressing' is clever and adds a humorous twist, making it a fun pun.","to":"CFf6SMjR3eNKR7me9CGHhRNE1SwSQaPi5r4MWZQFGB2W"}
 ```
 
-## How
-WASM WASI 0.2 allows [all these interfaces](https://github.com/yoshuawuyts/awesome-wasm-components?tab=readme-ov-file#interfaces) and more
+## Notes
+The Rust target [wasm32-wasip2](https://doc.rust-lang.org/nightly/rustc/platform-support/wasm32-wasip2.html) is getting more support everyday but still many crates are not allowed
 
-Rust [.cargo/config.toml](.cargo/config.toml) applies `target = "wasm32-wasip2"` and many crates just work
+Additionally many crates do not support [async features](https://doc.rust-lang.org/book/ch17-00-async-await.html) and should not be considered for server use
+
+The use of OpenAI and Solana in this example does not involve friendly crates-- but is async!
 
 Expect to see SQLite show up in here soon
 
