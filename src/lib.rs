@@ -43,11 +43,18 @@ async fn get_balance(req: Request<IncomingBody>, responder: Responder) -> Finish
         return bad_request(responder, "missing query param `addr`\n").await;
     };
 
-    let output = bindings::local::app::helpers_interface::get_balance(&rpc, &input);
+    let handle = bindings::local::app::helpers_interface::get_balance(&rpc, &input);
+    let output = poll_until_ready(handle).await;
+    let is_error = is_error_json(&output);
+
     let response = Response::builder()
-        .status(StatusCode::OK)
-        .header("content-type", "text/plain")
-        .body(format!("{output}\n").into_body())
+        .status(if is_error {
+            StatusCode::INTERNAL_SERVER_ERROR
+        } else {
+            StatusCode::OK
+        })
+        .header("content-type", "application/json")
+        .body(output.into_body())
         .unwrap();
     responder.respond(response).await
 }
@@ -73,13 +80,42 @@ async fn chat_completion(req: Request<IncomingBody>, responder: Responder) -> Fi
     })
     .to_string();
 
-    let output = bindings::local::app::helpers_interface::chat_completion(&api_key, &payload);
+    let handle = bindings::local::app::helpers_interface::chat_completion(&api_key, &payload);
+    let output = poll_until_ready(handle).await;
+    let is_error = is_error_json(&output);
+
     let response = Response::builder()
-        .status(StatusCode::OK)
+        .status(if is_error {
+            StatusCode::INTERNAL_SERVER_ERROR
+        } else {
+            StatusCode::OK
+        })
         .header("content-type", "application/json")
         .body(output.into_body())
         .unwrap();
     responder.respond(response).await
+}
+
+async fn poll_until_ready(handle: i64) -> String {
+    loop {
+        let output = bindings::local::app::helpers_interface::poll(handle);
+        if output != "delay" {
+            return output;
+        }
+        wstd::task::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+fn is_error_json(output: &str) -> bool {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(output) else {
+        return false;
+    };
+
+    matches!(
+        value,
+        serde_json::Value::Object(ref map)
+            if map.len() == 1 && matches!(map.get("error"), Some(serde_json::Value::String(_)))
+    )
 }
 
 async fn bad_request(responder: Responder, message: &str) -> Finished {
