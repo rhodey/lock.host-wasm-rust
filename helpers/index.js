@@ -19,8 +19,23 @@ function poll(handle) {
 
 async function fetchNative(url, apiKey, body) {
   const headers = { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' }
+  const timeoutMs = 15_000
+  const controller = typeof AbortController === 'function' ? new AbortController() : null
+  let timeoutId
+
+  if (controller) {
+    timeoutId = setTimeout(() => controller.abort('Request timed out'), timeoutMs)
+  }
+
   console.log(123, url, apiKey, body.length >= 10)
-  const reply = await fetch(url, { method: 'POST', headers, body })
+  const reply = await fetch(url, {
+    method: 'POST',
+    headers,
+    body,
+    ...(controller ? { signal: controller.signal } : {}),
+  }).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId)
+  })
   console.log(456, url, apiKey, body.length >= 10)
   if (!reply.ok) { return { error: `HTTP ${reply.status}` } }
   return reply.json()
