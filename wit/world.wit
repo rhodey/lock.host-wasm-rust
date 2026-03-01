@@ -1,7 +1,7 @@
 package local:app;
 
 interface helpers-interface {
-  poll: func(amount: s64) -> string;
+  poll: func(handle: s64) -> string;
   chat-completion: func(api-key: string, json: string) -> s64;
   address-from-seed: func(seed: string) -> string;
   get-balance: func(rpc: string, address: string) -> s64;
