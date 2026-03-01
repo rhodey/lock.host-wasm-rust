@@ -27,11 +27,11 @@ curl https://wasmtime.dev/install.sh -sSf | bash
 + [app wallet](https://explorer.solana.com/address/DohcaGiBiC3yuPz4gHtoA7QJhyL5N7hk3EpnfFyHZR2S?cluster=devnet)
 + [user wallet](https://explorer.solana.com/address/CFf6SMjR3eNKR7me9CGHhRNE1SwSQaPi5r4MWZQFGB2W?cluster=devnet)
 ```
-just build
 cp example.env .env
+just build
 just run
 just joke 'why did the worker quit his job at the recycling factory? because it was soda pressing.'
-> {"signature":"25ndS3qg8EsiaN1uEBfpb63QNdWZDma8ap5Cc5Hv3P4nBM4kAd3pLJQiZHFGpYSm9HLcrzkQaz1mvDrw4Yy4Hu4X","from":"DohcaGiBiC3yuPz4gHtoA7QJhyL5N7hk3EpnfFyHZR2S","to":"CFf6SMjR3eNKR7me9CGHhRNE1SwSQaPi5r4MWZQFGB2W","thoughts":"The pun on 'soda pressing' is clever and plays with words, making it light-hearted and humorous."}
+> {"from":"DohcaGiBiC3yuPz4gHtoA7QJhyL5N7hk3EpnfFyHZR2S","signature":"2DF5yVe1dHoTa51RCDUDHzWGnNGbQVsmfieiQRn3hcYgADX4u8rezGrbVhfc4MwWKTiBBqjwaSGHkaueuzGTVXvq","thoughts":"The play on words with 'soda pressing' and 'so depressing' is clever and adds a humorous twist, making it a fun pun.","to":"CFf6SMjR3eNKR7me9CGHhRNE1SwSQaPi5r4MWZQFGB2W"}
 ```
 
 ## How
@@ -42,8 +42,8 @@ Rust [.cargo/config.toml](.cargo/config.toml) applies `target = "wasm32-wasip2"`
 Expect to see SQLite show up in here soon
 
 ## Performance
-1. npx loadtest -n 10000 http://localhost:8080 == 11338 RPS
-2. npx loadtest -n 10000 -k http://localhost:8080 == 15385 RPS
+1. npx loadtest -n 10000 http://localhost:8080 == 16103 RPS
+2. npx loadtest -n 10000 -k http://localhost:8080 == 25316 RPS
 
 ## License
 hello@lock.host

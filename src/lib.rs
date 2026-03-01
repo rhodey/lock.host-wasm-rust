@@ -288,6 +288,6 @@ async fn get_joke(req: Request<Body>) -> Result<Response<Body>, Error> {
     };
 
     let from = bindings::local::app::helpers_interface::address_from_seed(&seed);
-    let body = serde_json::json!({ "from": from, "to": destination, "thoughts": thoughts, "signature": signature }).to_string();
+    let body = serde_json::json!({ "signature": signature, "from": from, "to": destination, "thoughts": thoughts }).to_string();
     Ok(build_json_response(StatusCode::OK, body))
 }
