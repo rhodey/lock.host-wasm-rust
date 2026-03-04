@@ -182,6 +182,7 @@ version = "0.1.0"
 dependencies = [
  "form_urlencoded",
  "serde_json",
+ "sqlite-wasm-wasi",
  "wit-bindgen 0.53.1",
  "wit-bindgen-rt",
  "wstd",
@@ -298,6 +299,15 @@ name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
+
+[[package]]
+name = "sqlite-wasm-wasi"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d673b0c0bd80680899338657d3198cb1506a1498e27b2f301ca949c8909ebf3"
+dependencies = [
+ "wit-bindgen 0.53.1",
+]
 
 [[package]]
 name = "syn"

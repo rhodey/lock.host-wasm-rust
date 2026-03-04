@@ -3,6 +3,7 @@ use serde_json::Value;
 use std::env;
 use wstd::http::body::Body;
 use wstd::http::{BodyExt, Client, Error, Method, Request, Response, StatusCode, Uri};
+use sqlite_wasm_wasi::{open, Value as SQLiteValue};
 
 mod bindings {
     wit_bindgen::generate!({
@@ -10,6 +11,16 @@ mod bindings {
         world: "app",
     });
 }
+
+/*
+ * todo: I need to use db in get_joke function
+ * todo: but I only want db to be created once
+let db = open("/app/example.rust.db")?;
+db.exec(
+    "create table example (id integer, name text, note text, ratio real, big_int integer)",
+    &[],
+)?;
+*/
 
 #[wstd::http_server]
 async fn main(req: Request<Body>) -> Result<Response<Body>, Error> {
