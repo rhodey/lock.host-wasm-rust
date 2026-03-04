@@ -1,4 +1,4 @@
-package local:app;
+package local:sever;
 
 interface helpers-interface {
   address-from-seed: func(seed: string) -> string;
@@ -9,6 +9,6 @@ world helpers {
   export helpers-interface;
 }
 
-world app {
+world sever {
   import helpers-interface;
 }

@@ -9,7 +9,7 @@ use sqlite_wasm_wasi::{open, Value as SQLiteValue};
 mod bindings {
     wit_bindgen::generate!({
         path: "wit",
-        world: "app",
+        world: "sever",
     });
 }
 
@@ -131,7 +131,7 @@ async fn get_balance(req: Request<Body>) -> Result<Response<Body>, Error> {
         None => {
             // app address
             let seed = "persistent keys arrive soon";
-            bindings::local::app::helpers_interface::address_from_seed(&seed)
+            bindings::local::sever::helpers_interface::address_from_seed(&seed)
         }
     };
 
@@ -323,7 +323,7 @@ async fn get_joke(req: Request<Body>) -> Result<Response<Body>, Error> {
     };
 
     let seed = "persistent keys arrive soon";
-    let transfer = bindings::local::app::helpers_interface::transfer_from_seed(
+    let transfer = bindings::local::sever::helpers_interface::transfer_from_seed(
         &seed,
         &destination,
         1_000_000,
@@ -349,7 +349,7 @@ async fn get_joke(req: Request<Body>) -> Result<Response<Body>, Error> {
         }
     };
 
-    let from = bindings::local::app::helpers_interface::address_from_seed(&seed);
+    let from = bindings::local::sever::helpers_interface::address_from_seed(&seed);
     let body = serde_json::json!({ "signature": signature, "from": from, "to": destination, "thoughts": thoughts }).to_string();
     Ok(build_json_response(StatusCode::OK, body))
 }
