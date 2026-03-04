@@ -23,7 +23,7 @@ apt install just (or brew install just)
 curl https://wasmtime.dev/install.sh -sSf | bash
 ```
 
-You also need [wac](https://github.com/bytecodealliance/wac) and unfortunately this is a long build:
+You also need [wac](https://github.com/bytecodealliance/wac) and this one takes a few minutes:
 ```
 cargo install wac-cli
 ```
@@ -52,8 +52,8 @@ The use of OpenAI and Solana in this example does not involve friendly crates-- 
 [SQLiteWasmWasi](https://github.com/rhodey/sqlitewasmwasi) is using [rusqlite](https://crates.io/crates/rusqlite) internally
 
 ## Performance
-1. npx loadtest -n 10000 http://localhost:8080 == 16103 RPS
-2. npx loadtest -n 10000 -k http://localhost:8080 == 25316 RPS
+1. npx loadtest -n 10000 http://localhost:8080 == 14620 RPS
+2. npx loadtest -n 10000 -k http://localhost:8080 == 22075 RPS
 
 ## License
 hello@lock.host
