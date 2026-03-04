@@ -1,6 +1,7 @@
 use form_urlencoded;
 use serde_json::Value;
 use std::env;
+use std::sync::OnceLock;
 use wstd::http::body::Body;
 use wstd::http::{BodyExt, Client, Error, Method, Request, Response, StatusCode, Uri};
 use sqlite_wasm_wasi::{open, Value as SQLiteValue};
@@ -12,15 +13,26 @@ mod bindings {
     });
 }
 
-/*
- * todo: I need to use db in get_joke function
- * todo: but I only want db to be created once
-let db = open("/app/example.rust.db")?;
-db.exec(
-    "create table example (id integer, name text, note text, ratio real, big_int integer)",
-    &[],
-)?;
-*/
+static DB: OnceLock<sqlite_wasm_wasi::Database> = OnceLock::new();
+
+fn init_db() -> Result<sqlite_wasm_wasi::Database, sqlite_wasm_wasi::Error> {
+    let db = open("/app/app.db")?;
+    db.exec(
+        "create table if not exists jokes \
+          (id integer primary key, address text, joke text, thoughts text, funny integer)",
+        &[],
+    )?;
+    Ok(db)
+}
+
+fn get_db() -> Result<sqlite_wasm_wasi::Database, sqlite_wasm_wasi::Error> {
+    if let Some(db) = DB.get() {
+        return Ok(*db);
+    }
+    let db = init_db()?;
+    let _ = DB.set(db);
+    Ok(*DB.get().expect("db should be ready"))
+}
 
 #[wstd::http_server]
 async fn main(req: Request<Body>) -> Result<Response<Body>, Error> {
@@ -161,6 +173,30 @@ async fn get_joke(req: Request<Body>) -> Result<Response<Body>, Error> {
         return bad_request("missing query param `addr`\n").await;
     };
 
+    let db = match get_db() {
+        Ok(db) => db,
+        Err(err) => {
+            let body = serde_json::json!({ "error": format!("db open error: {err}") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
+    let insert = match db.prepare("insert into jokes (address, joke) values (?, ?)") {
+        Ok(statement) => statement,
+        Err(err) => {
+            let body = serde_json::json!({ "error": format!("db prepare error: {err}") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
+    let joke_id = match insert.run(&[SQLiteValue::Text(destination.clone()), SQLiteValue::Text(message.clone())]) {
+        Ok(info) => info.last_insert_rowid,
+        Err(err) => {
+          let body = serde_json::json!({ "error": format!("db insert error: {err}") }).to_string();
+          return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
     let payload = serde_json::json!({
         "model": "gpt-4o-mini",
         "tools": [{
@@ -235,7 +271,22 @@ async fn get_joke(req: Request<Body>) -> Result<Response<Body>, Error> {
         }
     };
 
-    if decision != "funny" {
+    let is_funny = if decision == "funny" { 1 } else { 0 };
+
+    let update = match db.prepare("update jokes set thoughts = ?, funny = ? where id = ?") {
+        Ok(statement) => statement,
+        Err(err) => {
+            let body = serde_json::json!({ "error": format!("db prepare error: {err}") }).to_string();
+            return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+        }
+    };
+
+    if let Err(err) = update.run(&[SQLiteValue::Text(thoughts.clone()), SQLiteValue::Integer(is_funny), SQLiteValue::Integer(joke_id)]) {
+        let body = serde_json::json!({ "error": format!("db update error: {err}") }).to_string();
+        return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
+    };
+
+    if is_funny == 0 {
         let body = serde_json::json!({ "thoughts": thoughts }).to_string();
         return Ok(build_json_response(StatusCode::OK, body))
     }
