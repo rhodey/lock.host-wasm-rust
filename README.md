@@ -7,6 +7,7 @@ This demonstration uses OpenAI to control a Solana wallet:
 + Hit /api/joke?message=your best joke&addr=abc123
 + OAI is asked "You are to decide if a joke is funny or not"
 + If so 0.001 SOL is sent to addr
++ jokes are written to SQLite by [SQLiteWasmWasi](https://github.com/rhodey/sqlitewasmwasi)
 
 ## Why
 [Lock.host-node](https://github.com/rhodey/lock.host-node) demonstrates the same features but is expensive to host
@@ -22,6 +23,11 @@ apt install just (or brew install just)
 curl https://wasmtime.dev/install.sh -sSf | bash
 ```
 
+You also need [wac](https://github.com/bytecodealliance/wac) and unfortunately this is a long build:
+```
+cargo install wac-cli
+```
+
 ## Run
 + [http://localhost:8080](http://localhost:8080)
 + [app wallet](https://explorer.solana.com/address/DohcaGiBiC3yuPz4gHtoA7QJhyL5N7hk3EpnfFyHZR2S?cluster=devnet)
@@ -32,6 +38,8 @@ just build
 just run
 just joke 'why did the worker quit his job at the recycling factory? because it was soda pressing.'
 > {"from":"DohcaGiBiC3yuPz4gHtoA7QJhyL5N7hk3EpnfFyHZR2S","signature":"2DF5yVe1dHoTa51RCDUDHzWGnNGbQVsmfieiQRn3hcYgADX4u8rezGrbVhfc4MwWKTiBBqjwaSGHkaueuzGTVXvq","thoughts":"The play on words with 'soda pressing' and 'so depressing' is clever and adds a humorous twist, making it a fun pun.","to":"CFf6SMjR3eNKR7me9CGHhRNE1SwSQaPi5r4MWZQFGB2W"}
+sqlite3 mount/app.db "select * from jokes;"
+> 1|CFf6SMjR3eNKR7me9CGHhRNE1SwSQaPi5r4MWZQFGB2W|why did the worker quit his job at the recycling factory? because it was soda pressing.|The play on words with 'soda pressing' and 'so depressing' is clever and adds a humorous twist, making it a fun pun.|1
 ```
 
 ## Notes
@@ -41,7 +49,7 @@ Additionally many crates do not support [async features](https://doc.rust-lang.o
 
 The use of OpenAI and Solana in this example does not involve friendly crates-- but is async!
 
-Expect to see SQLite show up in here soon
+[SQLiteWasmWasi](https://github.com/rhodey/sqlitewasmwasi) is using [rusqlite](https://crates.io/crates/rusqlite) internally
 
 ## Performance
 1. npx loadtest -n 10000 http://localhost:8080 == 16103 RPS
