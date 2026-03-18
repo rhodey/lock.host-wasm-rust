@@ -4,7 +4,7 @@ use std::env;
 use std::sync::OnceLock;
 use wstd::http::body::Body;
 use wstd::http::{BodyExt, Client, Error, Method, Request, Response, StatusCode, Uri};
-use sqlite_wasm_wasi::{open, Value as SQLiteValue};
+use sqlite_wasm_wasi::{open, Value as SQLiteValue, NO_PARAMS};
 
 mod bindings {
     wit_bindgen::generate!({
@@ -20,7 +20,7 @@ fn init_db() -> Result<sqlite_wasm_wasi::Database, sqlite_wasm_wasi::Error> {
     db.exec(
         "create table if not exists jokes \
           (id integer primary key, address text, joke text, thoughts text, funny integer)",
-        &[],
+        &NO_PARAMS,
     )?;
     Ok(db)
 }
@@ -189,7 +189,7 @@ async fn get_joke(req: Request<Body>) -> Result<Response<Body>, Error> {
         }
     };
 
-    let joke_id = match insert.run(&[SQLiteValue::Text(destination.clone()), SQLiteValue::Text(message.clone())]) {
+    let joke_id = match insert.run::<SQLiteValue>(&[destination.clone().into(), message.clone().into()]) {
         Ok(info) => info.last_insert_rowid,
         Err(err) => {
           let body = serde_json::json!({ "error": format!("db insert error: {err}") }).to_string();
@@ -281,7 +281,7 @@ async fn get_joke(req: Request<Body>) -> Result<Response<Body>, Error> {
         }
     };
 
-    if let Err(err) = update.run(&[SQLiteValue::Text(thoughts.clone()), SQLiteValue::Integer(is_funny), SQLiteValue::Integer(joke_id)]) {
+    if let Err(err) = update.run::<SQLiteValue>(&[thoughts.clone().into(), is_funny.into(), joke_id.into()]) {
         let body = serde_json::json!({ "error": format!("db update error: {err}") }).to_string();
         return Ok(build_json_response(StatusCode::INTERNAL_SERVER_ERROR, body));
     };

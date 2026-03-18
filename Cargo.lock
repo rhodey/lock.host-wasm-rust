@@ -302,9 +302,9 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "sqlite-wasm-wasi"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae06540e70465b1ba4a6593b2e98f4c72f7f2080084a55a4096f9c7481743f25"
+checksum = "bc5d7babda72beef423a9afb2903163123bbfed9610704a5601e552dfb15058f"
 dependencies = [
  "wit-bindgen 0.53.1",
 ]
