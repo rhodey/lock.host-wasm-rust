@@ -1,6 +1,4 @@
 # Lock.host-wasm-rust
-Lock.host WASM Rust example, see [Lock.host](https://github.com/rhodey/lock.host)
-
 This demonstration uses OpenAI to control a Solana wallet:
 + OpenAI API calls
 + Solana API calls
@@ -10,11 +8,13 @@ This demonstration uses OpenAI to control a Solana wallet:
 + jokes are written to SQLite by [SQLiteWasmWasi](https://github.com/rhodey/sqlitewasmwasi)
 
 ## Why
-[Lock.host-node](https://github.com/rhodey/lock.host-node) demonstrates the same features but is expensive to host
+Lock.host has a few things in the works.
 
-[Lock.host-python](https://github.com/rhodey/lock.host-python) also demonstrates the same features and is expensive to host
+Before pivoting to focus on [MonsterFt](https://github.com/rhodey/monsterft) Lock.host had numerous WASM POC online.
 
-It is very efficient to host WASM apps and so Lock.host has started in this direction
+There is a plan to return to attestation for WASM apps as a platform.
+
+MonsterFt, integrity layer for Raft, is what makes "code as contract" possible even in the face of bit flips.
 
 ## Setup
 Install [just](https://github.com/casey/just) then [wasmtime](https://github.com/bytecodealliance/wasmtime):
